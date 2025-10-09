@@ -27,6 +27,14 @@ export interface StreamDiffusionParams {
     preprocessor_params?: Record<string, unknown>;
     conditioning_scale: number;
   }>;
+  ip_adapter?: {
+    enabled?: boolean;
+    type?: 'regular' | 'faceid';
+    scale?: number;
+    weight_type?: string;
+    insightface_model_name?: 'buffalo_l';
+  };
+  ip_adapter_style_image_url?: string;
 }
 
 /**
@@ -117,36 +125,22 @@ export async function updateDaydreamPrompts(
   const defaultControlnets = [
     {
       enabled: true,
-      model_id: 'thibaud/controlnet-sd21-openpose-diffusers',
-      preprocessor: 'pose_tensorrt',
-      preprocessor_params: {},
-      conditioning_scale: 0,
-    },
-    {
-      enabled: true,
-      model_id: 'thibaud/controlnet-sd21-hed-diffusers',
-      preprocessor: 'soft_edge',
-      preprocessor_params: {},
-      conditioning_scale: 0,
-    },
-    {
-      enabled: true,
-      model_id: 'thibaud/controlnet-sd21-canny-diffusers',
-      preprocessor: 'canny',
-      preprocessor_params: { high_threshold: 200, low_threshold: 100 },
-      conditioning_scale: 0,
-    },
-    {
-      enabled: true,
-      model_id: 'thibaud/controlnet-sd21-depth-diffusers',
+      model_id: 'xinsir/controlnet-depth-sdxl-1.0',
       preprocessor: 'depth_tensorrt',
       preprocessor_params: {},
       conditioning_scale: 0,
     },
     {
       enabled: true,
-      model_id: 'thibaud/controlnet-sd21-color-diffusers',
-      preprocessor: 'passthrough',
+      model_id: 'xinsir/controlnet-canny-sdxl-1.0',
+      preprocessor: 'canny',
+      preprocessor_params: {},
+      conditioning_scale: 0,
+    },
+    {
+      enabled: true,
+      model_id: 'xinsir/controlnet-tile-sdxl-1.0',
+      preprocessor: 'feedback',
       preprocessor_params: {},
       conditioning_scale: 0,
     },
@@ -162,13 +156,18 @@ export async function updateDaydreamPrompts(
     model_id: 'streamdiffusion',
     pipeline: 'live-video-to-video',
     params: {
-      model_id: params.model_id || 'stabilityai/sd-turbo',
+      model_id: params.model_id || 'stabilityai/sdxl-turbo',
       prompt: params.prompt,
       negative_prompt: params.negative_prompt || 'blurry, low quality, flat, 2d',
       num_inference_steps: params.num_inference_steps || 50,
       seed: params.seed || 42,
       t_index_list: params.t_index_list || [6, 12, 18],
       controlnets: mergedControlnets,
+      // Pass through IP-Adapter configuration if provided
+      ...(params.ip_adapter ? { ip_adapter: params.ip_adapter } : {}),
+      ...(params.ip_adapter_style_image_url
+        ? { ip_adapter_style_image_url: params.ip_adapter_style_image_url }
+        : {}),
     },
   };
 

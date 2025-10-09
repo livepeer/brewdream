@@ -13,6 +13,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { createDaydreamStream, startWhipPublish, updateDaydreamPrompts } from '@/lib/daydream';
+import type { StreamDiffusionParams } from '@/lib/daydream';
 
 const FRONT_PROMPTS = [
   "studio ghibli portrait, soft rim light",
@@ -179,11 +180,11 @@ export default function Capture() {
         title: 'Stream ready!',
         description: 'You can now start recording',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error initializing stream:', error);
       toast({
         title: 'Error',
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     } finally {
@@ -224,21 +225,62 @@ export default function Capture() {
       // Calculate t_index_list based on creativity and quality
       const tIndexList = calculateTIndexList(creativity[0], quality[0]);
 
-      // Build the full prompt with texture if selected
-      const fullPrompt = selectedTexture 
-        ? `${prompt}, texture overlay weight ${textureWeight[0].toFixed(2)}`
-        : prompt;
+      // Determine IP-Adapter settings when a texture is selected
+      const selectedTextureObj = selectedTexture
+        ? TEXTURES.find((t) => t.id === selectedTexture)
+        : null;
 
-      // Use the StreamDiffusion prompt helper with proper params
-      await updateDaydreamPrompts(streamId, {
-        prompt: fullPrompt,
+      // Build params for StreamDiffusion
+      const params: StreamDiffusionParams = {
+        model_id: 'stabilityai/sdxl-turbo',
+        prompt,
         negative_prompt: 'blurry, low quality, flat, 2d, distorted',
         t_index_list: tIndexList,
         seed: 42,
         num_inference_steps: 50,
-      });
+      };
 
-    } catch (error: any) {
+      // Include IP-Adapter only if a texture is selected
+      if (selectedTextureObj) {
+        params.ip_adapter = {
+          enabled: true,
+          type: 'regular',
+          scale: textureWeight[0],
+          weight_type: 'linear',
+          insightface_model_name: 'buffalo_l',
+        };
+        params.ip_adapter_style_image_url = selectedTextureObj.url;
+
+        // Use SDXL default controlnets but set conditioning_scale to 0 (disabled via scale)
+        params.controlnets = [
+          {
+            enabled: true,
+            model_id: 'xinsir/controlnet-depth-sdxl-1.0',
+            preprocessor: 'depth_tensorrt',
+            preprocessor_params: {},
+            conditioning_scale: 0,
+          },
+          {
+            enabled: true,
+            model_id: 'xinsir/controlnet-canny-sdxl-1.0',
+            preprocessor: 'canny',
+            preprocessor_params: {},
+            conditioning_scale: 0,
+          },
+          {
+            enabled: true,
+            model_id: 'xinsir/controlnet-tile-sdxl-1.0',
+            preprocessor: 'feedback',
+            preprocessor_params: {},
+            conditioning_scale: 0,
+          },
+        ];
+      }
+
+      // Use the StreamDiffusion prompt helper with proper params
+      await updateDaydreamPrompts(streamId, params);
+
+    } catch (error: unknown) {
       console.error('Error updating prompt:', error);
     }
   };
@@ -312,10 +354,10 @@ export default function Capture() {
           navigate(`/clip/${clip.id}`);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error creating clip',
-        description: error.message,
+        description: error instanceof Error ? error.message : String(error),
         variant: 'destructive',
       });
     } finally {
@@ -359,7 +401,7 @@ export default function Capture() {
               {showMultipleCameras ? 'Select which camera to use' : 'Start your webcam to begin'}
             </p>
           </div>
-    
+
           <div className="space-y-4">
             {showMultipleCameras ? (
               <>
@@ -376,7 +418,7 @@ export default function Capture() {
                     </div>
                   </div>
                 </Button>
-    
+
                 <Button
                   onClick={() => selectCamera('back')}
                   className="w-full h-20 bg-neutral-900 border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 transition-all duration-200"
@@ -478,7 +520,7 @@ export default function Capture() {
                           alt="Selected texture"
                           className="w-8 h-8 object-cover rounded"
                         />
-                       
+
                       </>
                       ) : (
                         <ImageOff className="w-5 h-5 text-neutral-400" />
