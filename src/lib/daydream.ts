@@ -42,7 +42,7 @@ export interface StreamDiffusionParams {
  */
 export async function createDaydreamStream(): Promise<DaydreamStream> {
   const { data, error } = await supabase.functions.invoke('daydream-stream', {
-    body: { pipeline_id: 'pip_qpUgXycjWF6YMeSL' }
+    body: { pipeline_id: 'pip_SDXL-turbo' }
   });
 
   if (error) throw error;
