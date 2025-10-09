@@ -80,30 +80,27 @@ export function Gallery() {
       );
   } 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-   <div className="absolute inset-0 -z-10">
-      <div className="absolute top-1/3 left-1/4 h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle_at_center,theme(colors.emerald.300/30),transparent_70%)] blur-3xl" />
-      <div className="absolute bottom-1/4 right-1/4 h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle_at_center,theme(colors.purple.300/25),transparent_70%)] blur-3xl" />
-    </div>
-
-    {/* Optional faint grid overlay */}
-    <div className="pointer-events-none absolute inset-0 -z-10 opacity-[0.05] [background-image:linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] [background-size:32px_32px]" />
+<div className="relative min-h-screen overflow-hidden bg-neutral-950">
+  {/* Radial fade overlay */}
+  <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_center,transparent_40%,rgb(0_0_0/.7)_100%)]" />
 
       <Header isAuthenticated={isAuthenticated} />
   
       <main className="flex-1 relative z-10 ">
+      <div className="absolute inset-0 -z-10">
+      <div className="absolute top-0 right-0 h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle_at_center,theme(colors.orange.400/30),transparent_70%)] blur-3xl" />
+      <div className="absolute top-40 left-0 h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle_at_center,theme(colors.pink.400/30),transparent_70%)] blur-3xl" />
+      <div className="absolute top-80 right-0 h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle_at_center,theme(colors.purple.400/25),transparent_70%)] blur-3xl" />
+    </div>
+
         <div className="container mx-auto px-6 py-16">
           <div className="mb-16 text-center">
             <p className="mb-4 text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              Powered by Daydream
+              Powered by <img src="/dd-logo.png" alt="Daydream" className="inline-block h-[2em] w-auto align-baseline mx-[2px] pl-2 pt-3" /> Daydream
             </p>
             <h1 className="text-balance mb-6 bg-gradient-to-r from-foreground via-foreground/80 to-foreground/40 bg-clip-text text-5xl font-extrabold text-transparent md:text-6xl">
               Create your <br />
-              <img
-                src="/daydream-logo.svg"
-                alt="Daydream"
-                className="inline-block h-[0.8em] w-auto align-baseline mx-[2px] pt-2 pr-2"
-              />
+           
               brewdream
             </h1>
             <p className="mx-auto max-w-2xl text-balance text-lg text-muted-foreground">
