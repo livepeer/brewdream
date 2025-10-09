@@ -14,7 +14,141 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clips: {
+        Row: {
+          asset_playback_id: string
+          asset_url: string | null
+          created_at: string | null
+          duration_ms: number
+          id: string
+          prompt: string
+          session_id: string
+          t_index_list: number[] | null
+          texture_id: string | null
+          texture_weight: number | null
+        }
+        Insert: {
+          asset_playback_id: string
+          asset_url?: string | null
+          created_at?: string | null
+          duration_ms: number
+          id?: string
+          prompt: string
+          session_id: string
+          t_index_list?: number[] | null
+          texture_id?: string | null
+          texture_weight?: number | null
+        }
+        Update: {
+          asset_playback_id?: string
+          asset_url?: string | null
+          created_at?: string | null
+          duration_ms?: number
+          id?: string
+          prompt?: string
+          session_id?: string
+          t_index_list?: number[] | null
+          texture_id?: string | null
+          texture_weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clips_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sessions: {
+        Row: {
+          camera_type: string
+          created_at: string | null
+          id: string
+          playback_id: string
+          stream_id: string
+          user_id: string
+        }
+        Insert: {
+          camera_type: string
+          created_at?: string | null
+          id?: string
+          playback_id: string
+          stream_id: string
+          user_id: string
+        }
+        Update: {
+          camera_type?: string
+          created_at?: string | null
+          id?: string
+          playback_id?: string
+          stream_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tickets: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          redeemed: boolean | null
+          session_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          redeemed?: boolean | null
+          session_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          redeemed?: boolean | null
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          twitter_handle: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          twitter_handle?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          twitter_handle?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
