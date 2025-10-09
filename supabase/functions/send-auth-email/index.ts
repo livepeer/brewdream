@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
   const payload = await req.text()
   const headers = Object.fromEntries(req.headers)
   const wh = new Webhook(hookSecret)
-  
+
   try {
     const {
       user,
@@ -45,12 +45,12 @@ Deno.serve(async (req) => {
     )
 
     const { error } = await resend.emails.send({
-      from: 'Daydream <onboarding@resend.dev>',
+      from: 'Brewdream <onboarding@resend.dev>',
       to: [user.email],
-      subject: 'Your Login Code',
+      subject: 'Your Brewdream Login Code',
       html,
     })
-    
+
     if (error) {
       console.error('Error sending email:', error)
       throw error

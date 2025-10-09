@@ -10,7 +10,7 @@ export function Landing() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-accent glow-strong mb-4">
             <Video className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-5xl font-bold gradient-text">DD Coffee Clip</h1>
+          <h1 className="text-5xl font-bold gradient-text">Brewdream</h1>
           <p className="text-xl text-muted-foreground">
             Realtime AI Video Summit
           </p>

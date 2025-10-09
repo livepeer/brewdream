@@ -63,9 +63,9 @@ export function Gallery() {
         <div className="container mx-auto px-6 py-16">
           <div className="mb-16 text-center">
             <p className="mb-4 text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              Powered by daydream
+              Powered by Daydream
             </p>
-            <h1 className="text-balance mb-6 text-5xl font-bold text-foreground md:text-6xl">Create your daydream</h1>
+            <h1 className="text-balance mb-6 text-5xl font-bold text-foreground md:text-6xl">Create your brewdream</h1>
             <p className="mx-auto max-w-2xl text-balance text-lg text-muted-foreground">
               Create a clip and show it at the booth to win a{" "}
               <strong className="font-bold text-foreground">free coffee</strong>. Share your creativity and get

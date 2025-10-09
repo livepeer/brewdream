@@ -1,6 +1,15 @@
-# Welcome to your Lovable project
+# Brewdream - Realtime AI Video Summit
+
+> **🤖 For AI Agents**:
+> - Read [`PRD.md`](./PRD.md) first to understand **what to build** (product vision, requirements, acceptance criteria)
+> - Then read [`VIBEME.md`](./VIBEME.md) to understand **how it's built** (current implementation, architecture patterns, coding conventions)
+> - These documents are tightly integrated - PRD is the source of truth for features, VIBEME is the source of truth for code patterns
 
 ## Project info
+
+**Project**: Brewdream - Mobile-first microsite for Livepeer × Daydream Summit (Open Source AI Week)
+
+**What it does**: Attendees scan QR, create AI-stylized video clips (3-10s), share on X, get coffee tickets
 
 **URL**: https://lovable.dev/projects/c0dae90c-30a9-4f3c-904d-7418f6e67422
 
