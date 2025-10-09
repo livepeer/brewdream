@@ -128,7 +128,7 @@ export async function updateDaydreamPrompts(
       model_id: 'xinsir/controlnet-depth-sdxl-1.0',
       preprocessor: 'depth_tensorrt',
       preprocessor_params: {},
-      conditioning_scale: 0,
+      conditioning_scale: 0.3,
     },
     {
       enabled: true,
