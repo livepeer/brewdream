@@ -25,7 +25,7 @@ export function ClipCard({ clip }: ClipCardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="group relative overflow-hidden rounded-2xl bg-card"
+      className="group relative overflow-hidden rounded-2xl bg-card hover:shadow-lg hover:shadow-[0_0_15px_2px_theme(colors.neutral.700/0.4)] transition-all duration-300 hover:border-neutral-800 border border-neutral-900"
     >
       <Link to={`/clip/${clip.id}`} className="block">
         {/* Poster Image */}

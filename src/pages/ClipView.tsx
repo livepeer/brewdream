@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Eye, Heart, Share2, Download, Twitter, Home, Coffee, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/Header';
+import confetti from 'canvas-confetti';
 
 interface Clip {
   id: string;
@@ -26,6 +27,7 @@ export default function ClipView() {
   const [isLiked, setIsLiked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const { toast } = useToast();
+  const coffeeCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     loadClip();
@@ -113,6 +115,39 @@ export default function ClipView() {
         title: 'Coffee ticket generated!',
         description: 'Show this QR code at the coffee stand',
       });
+
+      // 🎉 Trigger confetti from card position
+      if (coffeeCardRef.current) {
+        const rect = coffeeCardRef.current.getBoundingClientRect();
+
+        // Compute approximate center of the card in viewport coordinates
+        const x = (rect.left + rect.width / 2) / window.innerWidth;
+        const y = (rect.top + rect.height / 2) / window.innerHeight;
+
+        // Burst upward like it's coming from behind the card
+        confetti({
+          particleCount: 80,
+          startVelocity: 35,
+          spread: 75,
+          origin: { x, y },
+          ticks: 180,
+          scalar: 1.2,
+          colors: ['#b87333', '#d1a35d', '#fff7e6'], // coffee + cream tones
+        });
+
+        // Add a softer follow-up burst for realism
+        setTimeout(() => {
+          confetti({
+            particleCount: 40,
+            startVelocity: 20,
+            spread: 60,
+            origin: { x, y: y - 0.1 },
+            scalar: 0.9,
+            colors: ['#c0a080', '#ffffff'],
+          });
+        }, 300);
+      }
+
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -163,7 +198,7 @@ export default function ClipView() {
             {/* Video Player */}
             <motion.div
               layoutId={`clip-${clip.id}`}
-              className="relative mb-6 overflow-hidden rounded-2xl bg-card"
+              className="relative mb-6 overflow-hidden rounded-2xl bg-card border border-neutral-800 shadow-lg shadow-[0_0_15px_2px_theme(colors.neutral.800/0.4)]"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4 }}
@@ -228,10 +263,11 @@ export default function ClipView() {
             </motion.div>
             {/* Coffee Ticket Section */}
             <motion.div
+              ref={coffeeCardRef}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.4 }}
-              className="bg-card rounded-2xl p-6 border border-border"
+              className="bg-card rounded-2xl p-6 border border-border relative overflow-hidden"
             >
               {ticketCode ? (
                 <div className="text-center">
