@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Gallery } from "./components/Gallery";
 import { Landing } from "./components/Landing";
 import { Login } from "./components/Login";
+import { Header } from "./components/Header";
 import Capture from "./pages/Capture";
 import ClipView from "./pages/ClipView";
 import NotFound from "./pages/NotFound";
@@ -18,14 +19,16 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Gallery />} />
-          <Route path="/start" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/capture" element={<Capture />} />
-          <Route path="/clip/:id" element={<ClipView />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <div className="min-h-screen bg-background">
+          <Routes>
+            <Route path="/" element={<Gallery />} />
+            <Route path="/start" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/capture" element={<Capture />} />
+            <Route path="/clip/:id" element={<ClipView />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </div>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

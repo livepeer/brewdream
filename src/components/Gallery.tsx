@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Link } from 'react-router-dom';
-import { PlayCircle } from 'lucide-react';
+import { Header } from './Header';
+import { ClipCard } from './ClipCard';
+import { FloatingFAB } from './FloatingFAB';
 
 interface Clip {
   id: string;
@@ -14,9 +15,11 @@ interface Clip {
 export function Gallery() {
   const [clips, setClips] = useState<Clip[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     loadClips();
+    checkAuth();
   }, []);
 
   const loadClips = async () => {
@@ -35,6 +38,15 @@ export function Gallery() {
     }
   };
 
+  const checkAuth = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsAuthenticated(!!user);
+    } catch (error) {
+      console.error('Error checking auth:', error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -44,62 +56,46 @@ export function Gallery() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold mb-2 gradient-text">DD Coffee Clip</h1>
-          <p className="text-muted-foreground">Realtime AI Video Gallery</p>
-        </div>
+    <div className="min-h-screen">
+      <Header isAuthenticated={isAuthenticated} />
 
-        {clips.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-muted-foreground mb-4">No clips yet. Be the first to create one!</p>
-            <Link 
-              to="/start" 
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium glow-primary hover:scale-105 transition-smooth"
-            >
-              Create Your Clip
-            </Link>
+      <main className="flex-1">
+        <div className="container mx-auto px-6 py-16">
+          <div className="mb-16 text-center">
+            <p className="mb-4 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+              Powered by daydream
+            </p>
+            <h1 className="text-balance mb-6 text-5xl font-bold text-foreground md:text-6xl">Create your daydream</h1>
+            <p className="mx-auto max-w-2xl text-balance text-lg text-muted-foreground">
+              Create a clip and show it at the booth to win a{" "}
+              <strong className="font-bold text-foreground">free coffee</strong>. Share your creativity and get
+              rewarded!
+            </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+
+          {/* Masonry Grid */}
+          <div className="columns-1 gap-6 sm:columns-2 lg:columns-3 xl:columns-4">
             {clips.map((clip) => (
-              <Link
-                key={clip.id}
-                to={`/clip/${clip.id}`}
-                className="group relative aspect-square rounded-2xl overflow-hidden bg-card border border-border hover:border-primary transition-smooth"
-              >
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20">
-                  <img
-                    src={`https://lvpr.tv/?v=${clip.asset_playback_id}`}
-                    alt={clip.prompt}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/50 to-transparent opacity-0 group-hover:opacity-100 transition-smooth flex items-end p-4">
-                  <div className="w-full">
-                    <p className="text-sm font-medium line-clamp-2 mb-2">{clip.prompt}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <PlayCircle className="w-4 h-4" />
-                      <span>{(clip.duration_ms / 1000).toFixed(1)}s</span>
-                    </div>
-                  </div>
-                </div>
-              </Link>
+              <div key={clip.id} className="mb-6 break-inside-avoid">
+                <ClipCard clip={clip} />
+              </div>
             ))}
           </div>
-        )}
 
-        <div className="text-center mt-12">
-          <Link
-            to="/start"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-primary-foreground rounded-full font-medium glow-primary hover:scale-105 transition-smooth"
-          >
-            Create Your Clip
-          </Link>
+          {/* Empty State */}
+          {clips.length === 0 && (
+            <div className="flex min-h-[400px] items-center justify-center">
+              <div className="text-center">
+                <p className="text-lg text-muted-foreground">
+                  No clips found. Run the database setup scripts to add sample data.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      </main>
+
+      <FloatingFAB isAuthenticated={isAuthenticated} />
     </div>
   );
 }
