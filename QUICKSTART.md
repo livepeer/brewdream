@@ -11,7 +11,7 @@ cd clip-and-brew
 npm install
 
 # 3. Get .env.local from your team
-# (Contains Supabase credentials - ask in Slack/Discord)
+# (Contains Daydream/Studio credentials - ask in Slack/Discord)
 
 # 4. Start developing!
 npm run dev
