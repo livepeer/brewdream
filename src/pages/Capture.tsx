@@ -420,7 +420,7 @@ export default function Capture() {
       <div className="max-w-2xl mx-auto space-y-4">
         {/* Main Video Output */}
 
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>

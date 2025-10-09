@@ -48,12 +48,37 @@ export function Gallery() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading gallery...</div>
-      </div>
-    );
-  }
+      return (
+        <div className="min-h-screen">
+          <Header isAuthenticated={isAuthenticated} />
+    
+          <main className="flex-1">
+            <div className="container mx-auto px-6 py-16">
+            <div className="mb-16 text-center">
+              <p className="mb-4 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                Powered by Daydream
+              </p>
+              <h1 className="text-balance mb-6 text-5xl font-bold text-foreground md:text-6xl">Create your brewdream</h1>
+              <p className="mx-auto max-w-2xl text-balance text-lg text-muted-foreground">
+                Create a clip and show it at the booth to win a{" "}
+                <strong className="font-bold text-foreground">free coffee</strong>. Share your creativity and get
+                rewarded!
+              </p>
+            </div>
+              {/* Masonry Grid Skeleton */}
+              <div className="columns-1 gap-6 sm:columns-2 lg:columns-3 xl:columns-4">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="mb-6 break-inside-avoid">
+                    <div className="h-[500px] w-full animate-pulse rounded-xl bg-card" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </main>
+    
+        </div>
+      );
+  } 
 
   return (
     <div className="min-h-screen">

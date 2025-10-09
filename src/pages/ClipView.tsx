@@ -273,7 +273,7 @@ export default function ClipView() {
                 <div className="text-center">
                   <Coffee className="w-12 h-12 mx-auto mb-4 text-primary" />
                   <h3 className="text-lg font-bold mb-2">Your Coffee Ticket</h3>
-                  <div className="text-4xl font-mono font-bold tracking-wider text-primary mb-2">
+                  <div className="text-4xl font-mono font-bold tracking-wider bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 bg-clip-text text-transparent mb-2">
                     {ticketCode}
                   </div>
                   <p className="text-sm text-muted-foreground">

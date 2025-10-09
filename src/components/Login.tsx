@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, ArrowLeft, User } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -158,58 +157,55 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
-      <div className="max-w-md w-full space-y-8">
-        <Link to="/start" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-smooth">
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </Link>
-
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gradient-to-br from-primary to-accent glow-primary mb-4">
-            {isAnonymous ? <User className="w-8 h-8 text-white" /> : <Mail className="w-8 h-8 text-white" />}
-          </div>
-          <h1 className="text-3xl font-bold mb-2">
-            {otpSent ? 'Enter code' : isAnonymous ? 'Add your email' : 'Get started'}
-          </h1>
-          <p className="text-muted-foreground">
-            {otpSent
-              ? 'Check your email for the login code'
-              : isAnonymous
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-background">
+        <div className="w-full max-w-md space-y-8">
+          <Link
+            to="/"
+            className="flex items-center gap-3 mb-8 justify-center hover:opacity-90 transition"
+          >
+            <img src="/daydream-logo.svg" alt="Daydream" className="h-8 w-auto" />
+            <h2 className="text-xl font-bold text-foreground">Brewdream</h2>
+          </Link>
+  
+          <div className="text-center bg-neutral-950 shadow-lg shadow-[0_0_15px_2px_theme(colors.neutral.800/0.4)] border border-neutral-800 rounded-3xl p-6">
+       
+  
+            <h1 className="text-3xl font-bold mb-2">
+              {otpSent ? 'Enter code' : isAnonymous ? 'Add your email' : 'Sign in'}
+            </h1>
+            <p className="text-muted-foreground">
+              {otpSent
+                ? 'Check your email for the login code'
+                : isAnonymous
                 ? 'Save your clips and get a coffee ticket'
                 : 'Create AI video clips in seconds'}
-          </p>
-        </div>
+            </p>
 
-        {!otpSent ? (
-          <div className="space-y-4">
-            {/* Anonymous login button (primary CTA when not anonymous) */}
-            {!isAnonymous && (
-              <>
-                <Button
-                  onClick={handleAnonymousLogin}
-                  disabled={loading}
-                  className="w-full h-14 bg-primary text-primary-foreground text-lg font-semibold glow-primary hover:scale-105 transition-smooth"
-                >
-                  {loading ? 'Loading...' : 'Continue without email'}
-                </Button>
 
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border" />
+          {!otpSent ? (
+            <div className="space-y-4">
+              {!isAnonymous && (
+                <>
+                  <Button
+                    onClick={handleAnonymousLogin}
+                    disabled={loading}
+                    className="w-full h-14 bg-neutral-100 text-neutral-900 mt-8 hover:bg-neutral-200 border border-border transition-colors"
+                  >
+                    {loading ? 'Loading...' : 'Continue without email'}
+                  </Button>
+  
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">or sign in with email</span>
+                    </div>
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      Or sign in with email
-                    </span>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Email form */}
-            <form onSubmit={handleSendOtp} className="space-y-4">
-              <div>
+                </>
+              )}
+  
+              <form onSubmit={handleSendOtp} className="space-y-4">
                 <Input
                   type="email"
                   placeholder="your@email.com"
@@ -218,23 +214,25 @@ export function Login() {
                   required
                   className="h-12 bg-card border-border text-foreground"
                 />
-              </div>
-              <Button
-                type="submit"
-                disabled={loading}
-                className={`w-full h-12 ${isAnonymous ? 'bg-primary text-primary-foreground glow-primary' : 'bg-card border border-border hover:bg-accent'}`}
-              >
-                {loading
-                  ? 'Sending...'
-                  : isAnonymous
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className={`w-full h-12 ${
+                    isAnonymous
+                      ? 'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 border border-border'
+                      : 'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 border border-border'
+                  }`}
+                >
+                  {loading
+                    ? 'Sending...'
+                    : isAnonymous
                     ? 'Add email & get coffee ticket'
                     : 'Send login code'}
-              </Button>
-            </form>
-          </div>
-        ) : (
-          <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <div>
+                </Button>
+              </form>
+            </div>
+          ) : (
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
               <Input
                 type="text"
                 placeholder="Enter 6-digit code"
@@ -242,26 +240,26 @@ export function Login() {
                 onChange={(e) => setOtp(e.target.value)}
                 required
                 maxLength={6}
-                className="h-12 bg-card border-border text-center text-2xl tracking-widest"
+                className="h-12 bg-card border-border text-center text-2xl tracking-widest mt-8"
               />
-            </div>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full h-12 bg-primary text-primary-foreground glow-primary"
-            >
-              {loading ? 'Verifying...' : 'Verify code'}
-            </Button>
-            <button
-              type="button"
-              onClick={() => setOtpSent(false)}
-              className="w-full text-sm text-muted-foreground hover:text-foreground transition-smooth"
-            >
-              Use a different email
-            </button>
-          </form>
-        )}
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full h-12 bg-neutral-100 text-foreground hover:bg-neutral-200 border border-border"
+              >
+                {loading ? 'Verifying...' : 'Verify code'}
+              </Button>
+              <button
+                type="button"
+                onClick={() => setOtpSent(false)}
+                className="w-full text-sm text-muted-foreground hover:text-foreground transition"
+              >
+                Use a different email
+              </button>
+            </form>
+          )}
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
 }
