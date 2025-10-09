@@ -86,7 +86,7 @@ export function Landing() {
           onClick={handleStartClick}
           className="w-full py-4 px-6 bg-primary text-primary-foreground rounded-full font-semibold text-lg glow-primary hover:scale-105 transition-smooth h-auto"
         >
-          Create Your Daydream Clip
+          Brew Your Dream
         </Button>
 
         {/* Footer */}

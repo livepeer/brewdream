@@ -597,7 +597,7 @@ export default function Capture() {
           ) : (
             <span className="flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-neutral-900" />
-              Hold to Record (3–10s)
+              Brew (3–10s)
             </span>
           )}
         </Button>
