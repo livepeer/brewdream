@@ -1,6 +1,6 @@
 /**
  * Daydream Realtime Streaming Client
- * 
+ *
  * Provides helpers for creating streams, publishing via WHIP, and updating prompts.
  * All API calls are proxied through Supabase edge functions to keep API keys server-side.
  */
@@ -21,6 +21,7 @@ export interface StreamDiffusionParams {
   seed?: number;
   t_index_list?: number[];
   controlnets?: Array<{
+    enabled?: boolean;
     model_id: string;
     preprocessor: string;
     preprocessor_params?: Record<string, unknown>;
@@ -112,6 +113,51 @@ export async function updateDaydreamPrompts(
   streamId: string,
   params: StreamDiffusionParams
 ): Promise<void> {
+  // Ensure every controlnet includes enabled: true as required by Daydream API
+  const defaultControlnets = [
+    {
+      enabled: true,
+      model_id: 'thibaud/controlnet-sd21-openpose-diffusers',
+      preprocessor: 'pose_tensorrt',
+      preprocessor_params: {},
+      conditioning_scale: 0,
+    },
+    {
+      enabled: true,
+      model_id: 'thibaud/controlnet-sd21-hed-diffusers',
+      preprocessor: 'soft_edge',
+      preprocessor_params: {},
+      conditioning_scale: 0,
+    },
+    {
+      enabled: true,
+      model_id: 'thibaud/controlnet-sd21-canny-diffusers',
+      preprocessor: 'canny',
+      preprocessor_params: { high_threshold: 200, low_threshold: 100 },
+      conditioning_scale: 0,
+    },
+    {
+      enabled: true,
+      model_id: 'thibaud/controlnet-sd21-depth-diffusers',
+      preprocessor: 'depth_tensorrt',
+      preprocessor_params: {},
+      conditioning_scale: 0,
+    },
+    {
+      enabled: true,
+      model_id: 'thibaud/controlnet-sd21-color-diffusers',
+      preprocessor: 'passthrough',
+      preprocessor_params: {},
+      conditioning_scale: 0,
+    },
+  ];
+
+  const mergedControlnets = (params.controlnets || defaultControlnets).map((cn) => ({
+    enabled: true,
+    preprocessor_params: {},
+    ...cn,
+  }));
+
   const body = {
     model_id: 'streamdiffusion',
     pipeline: 'live-video-to-video',
@@ -122,38 +168,7 @@ export async function updateDaydreamPrompts(
       num_inference_steps: params.num_inference_steps || 50,
       seed: params.seed || 42,
       t_index_list: params.t_index_list || [6, 12, 18],
-      controlnets: params.controlnets || [
-        {
-          model_id: 'thibaud/controlnet-sd21-openpose-diffusers',
-          preprocessor: 'pose_tensorrt',
-          preprocessor_params: {},
-          conditioning_scale: 0,
-        },
-        {
-          model_id: 'thibaud/controlnet-sd21-hed-diffusers',
-          preprocessor: 'soft_edge',
-          preprocessor_params: {},
-          conditioning_scale: 0,
-        },
-        {
-          model_id: 'thibaud/controlnet-sd21-canny-diffusers',
-          preprocessor: 'canny',
-          preprocessor_params: { high_threshold: 200, low_threshold: 100 },
-          conditioning_scale: 0,
-        },
-        {
-          model_id: 'thibaud/controlnet-sd21-depth-diffusers',
-          preprocessor: 'depth_tensorrt',
-          preprocessor_params: {},
-          conditioning_scale: 0,
-        },
-        {
-          model_id: 'thibaud/controlnet-sd21-color-diffusers',
-          preprocessor: 'passthrough',
-          preprocessor_params: {},
-          conditioning_scale: 0,
-        },
-      ],
+      controlnets: mergedControlnets,
     },
   };
 
