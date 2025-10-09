@@ -217,7 +217,17 @@ export default function ClipView() {
               </div>
             </motion.div>
 
-            {/* Title and Description */}
+       
+
+         
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+
+       
+
+                 {/* Title and Description */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -230,14 +240,8 @@ export default function ClipView() {
               </p>
             </motion.div>
 
-         
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-
-               {/* Actions */}
-               <motion.div
+                    {/* Actions */}
+                    <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.4 }}

@@ -58,7 +58,7 @@ export function Gallery() {
               <p className="mb-4 text-sm font-medium uppercase tracking-wider text-muted-foreground">
                 Powered by Daydream
               </p>
-              <h1 className="text-balance mb-6 text-5xl font-bold text-foreground md:text-6xl">Create your brewdream</h1>
+              <h1 className="text-balance mb-6 bg-gradient-to-r from-foreground via-foreground/80 to-foreground/40 bg-clip-text text-5xl font-extrabold text-transparent md:text-6xl">Create your <br /> brewdream</h1>
               <p className="mx-auto max-w-2xl text-balance text-lg text-muted-foreground">
                 Create a clip and show it at the booth to win a{" "}
                 <strong className="font-bold text-foreground">free coffee</strong>. Share your creativity and get
@@ -79,34 +79,51 @@ export function Gallery() {
         </div>
       );
   } 
-
   return (
-    <div className="min-h-screen">
-      <Header isAuthenticated={isAuthenticated} />
+    <div className="relative min-h-screen overflow-hidden">
+   <div className="absolute inset-0 -z-10">
+      <div className="absolute top-1/3 left-1/4 h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle_at_center,theme(colors.emerald.300/30),transparent_70%)] blur-3xl" />
+      <div className="absolute bottom-1/4 right-1/4 h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle_at_center,theme(colors.purple.300/25),transparent_70%)] blur-3xl" />
+    </div>
 
-      <main className="flex-1">
+    {/* Optional faint grid overlay */}
+    <div className="pointer-events-none absolute inset-0 -z-10 opacity-[0.05] [background-image:linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] [background-size:32px_32px]" />
+
+      <Header isAuthenticated={isAuthenticated} />
+  
+      <main className="flex-1 relative z-10 ">
         <div className="container mx-auto px-6 py-16">
           <div className="mb-16 text-center">
             <p className="mb-4 text-sm font-medium uppercase tracking-wider text-muted-foreground">
               Powered by Daydream
             </p>
-            <h1 className="text-balance mb-6 text-5xl font-bold text-foreground md:text-6xl">Create your brewdream</h1>
+            <h1 className="text-balance mb-6 bg-gradient-to-r from-foreground via-foreground/80 to-foreground/40 bg-clip-text text-5xl font-extrabold text-transparent md:text-6xl">
+              Create your <br />
+              <img
+                src="/daydream-logo.svg"
+                alt="Daydream"
+                className="inline-block h-[0.8em] w-auto align-baseline mx-[2px] pt-2 pr-2"
+              />
+              brewdream
+            </h1>
             <p className="mx-auto max-w-2xl text-balance text-lg text-muted-foreground">
               Create a clip and show it at the booth to win a{" "}
-              <strong className="font-bold text-foreground">free coffee</strong>. Share your creativity and get
-              rewarded!
+              <strong className="font-bold text-foreground">free coffee</strong>.
+              Share your creativity and get rewarded!
             </p>
           </div>
-
+  
           {/* Masonry Grid */}
-          <div className="columns-1 gap-6 sm:columns-2 lg:columns-3 xl:columns-4">
+          <div className="columns-1 gap-6 sm:columns-2 lg:columns-3 xl:columns-4 relative z-10">
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-screen top-0 bg-gradient-to-t from-neutral-950 h-screen via-neutral-900 to-transparent opacity-30 blur-3xl" />
+
             {clips.map((clip) => (
               <div key={clip.id} className="mb-6 break-inside-avoid">
                 <ClipCard clip={clip} />
               </div>
             ))}
           </div>
-
+  
           {/* Empty State */}
           {clips.length === 0 && (
             <div className="flex min-h-[400px] items-center justify-center">
@@ -119,7 +136,7 @@ export function Gallery() {
           )}
         </div>
       </main>
-
+  
       <FloatingFAB isAuthenticated={isAuthenticated} />
     </div>
   );
