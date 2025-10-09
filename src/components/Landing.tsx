@@ -1,7 +1,35 @@
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Video, Sparkles, Coffee } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
 
 export function Landing() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    checkAuthAndRedirect();
+  }, []);
+
+  const checkAuthAndRedirect = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    // If logged in (anonymous or authenticated), go straight to capture
+    if (session) {
+      navigate('/capture');
+    }
+  };
+
+  const handleStartClick = () => {
+    // Check auth before navigating
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate('/capture');
+      } else {
+        navigate('/login');
+      }
+    });
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
       <div className="max-w-md w-full text-center space-y-8">
@@ -54,12 +82,12 @@ export function Landing() {
         </div>
 
         {/* CTA Button */}
-        <Link
-          to="/login"
-          className="block w-full py-4 px-6 bg-primary text-primary-foreground rounded-full font-semibold text-lg glow-primary hover:scale-105 transition-smooth"
+        <Button
+          onClick={handleStartClick}
+          className="w-full py-4 px-6 bg-primary text-primary-foreground rounded-full font-semibold text-lg glow-primary hover:scale-105 transition-smooth h-auto"
         >
           Create Your Daydream Clip
-        </Link>
+        </Button>
 
         {/* Footer */}
         <p className="text-sm text-muted-foreground">

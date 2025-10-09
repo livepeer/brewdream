@@ -161,11 +161,12 @@ export default function Capture() {
       // Save session to database
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('id')
-          .eq('email', user.email)
-          .single();
+        // For anonymous users, look up by ID instead of email
+        const query = user.is_anonymous
+          ? supabase.from('users').select('id').eq('id', user.id)
+          : supabase.from('users').select('id').eq('email', user.email);
+
+        const { data: userData } = await query.single();
 
         if (userData) {
           await supabase.from('sessions').insert({

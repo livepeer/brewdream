@@ -41,8 +41,46 @@ cd <YOUR_PROJECT_NAME>
 # Step 3: Install the necessary dependencies.
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Step 4: Get .env.local file from your team
+# Ask your team for the .env.local file with Supabase credentials
+# Place it in the project root (it's gitignored for security)
+
+# Step 5: Start the development server
 npm run dev
+```
+
+**Prerequisites:**
+- Node.js & npm - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- `.env.local` file with Supabase credentials (ask your team)
+
+## Development Testing
+
+**Anonymous Login (Fastest):**
+1. Run `npm run dev`
+2. Go to http://localhost:8080/login
+3. Click "Continue without email"
+4. Start creating clips immediately!
+
+**Email OTP Testing:**
+- Enter any email → Get OTP code in inbox
+- Or add email to anonymous account for coffee tickets
+
+### Quick Test Checklist
+
+```bash
+npm run dev
+
+# Test 1: Anonymous flow
+✓ Go to /login
+✓ Click "Continue without email"
+✓ Should redirect to /capture
+✓ Create a clip
+
+# Test 2: Email upgrade
+✓ Go back to /start
+✓ Should show "Add your email"
+✓ Enter email → verify OTP
+✓ All clips still there!
 ```
 
 **Edit a file directly in GitHub**
