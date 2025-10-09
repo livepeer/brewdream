@@ -29,13 +29,13 @@ const BACK_PROMPTS = [
 const TEXTURES = [
   {
     id: 'lava',
-    url: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/volcanic_rock_tiles/volcanic_rock_tiles_diff_1k.jpg',
-    name: 'Lava / Volcanic Rock (PH 1K)'
+    url: 'https://t4.ftcdn.net/jpg/01/83/14/47/360_F_183144766_dbGaN37u6a4VCliXQ6wcarerpYmuLAto.jpg',
+    name: 'Lava'
   },
   {
     id: 'galaxy_orion',
     url: 'https://science.nasa.gov/wp-content/uploads/2023/04/orion-nebula-xlarge_web-jpg.webp',
-    name: 'Galaxy / Orion Nebula (NASA)'
+    name: 'Galaxy'
   },
   {
     id: 'dragon_scales',
@@ -44,7 +44,7 @@ const TEXTURES = [
   },
   {
     id: 'water_ripples',
-    url: 'https://texturelabs.org/wp-content/uploads/2021/03/Texturelabs_Water_144.jpg',
+    url: 'https://media.gettyimages.com/id/585332126/photo/rock-face.jpg?s=612x612&w=gi&k=20&c=bX6I0qs7hVDXs0ZUaqPUb1uLkLaZm-ASZxVd5TDXW-A=',
     name: 'Water Ripples (TextureLabs)'
   },
   {
@@ -64,7 +64,7 @@ const TEXTURES = [
   },
   {
     id: 'foam_ocean',
-    url: 'https://ambientcg.com/getsingle?file=Foam003_1K-JPG_Color.jpg',
+    url: 'https://t3.ftcdn.net/jpg/02/03/50/32/360_F_203503200_3M3ZmpW9nhU6faaF3fewlkIMtRWxlHye.jpg',
     name: 'Ocean Foam (ambientCG 1K)'
   }
 ];
@@ -238,10 +238,6 @@ export default function Capture() {
         num_inference_steps: 50,
       });
 
-      toast({
-        title: 'Prompt updated!',
-        description: 'The AI effect is now active',
-      });
     } catch (error: any) {
       console.error('Error updating prompt:', error);
     }
@@ -473,7 +469,7 @@ export default function Capture() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="flex items-center gap-2 bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 !w-10 !h-10 rounded-full overflow-hidden px-0 py-0 w-full sm:w-auto"
+                    className="flex items-center gap-2 bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 !w-16 !h-16 rounded-full overflow-hidden px-0 py-0 w-full sm:w-auto"
                   >
                     {selectedTexture ? (
                       <>
@@ -505,7 +501,7 @@ export default function Capture() {
                           : "bg-neutral-950 border-neutral-800 hover:border-neutral-600"
                       }`}
                     >
-                      None
+                      <ImageOff className="w-5 h-5 text-neutral-400" />
                     </Button>
                     {TEXTURES.map((texture) => (
                       <Button

@@ -25,7 +25,7 @@ export function Header({ isAuthenticated = false }: HeaderProps) {
 
   return (
     <header className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-20 items-center justify-between px-6">
+      <div className="container mx-auto flex h-20 items-center justify-center lg:justify-between px-6">
         {/* Logo and Brand - centered on mobile */}
         <Link to="/" className="flex items-center gap-3 md:flex-none">
           <img src="/daydream-logo.svg" alt="Daydream" className="h-8 w-auto" />
