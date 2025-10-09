@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Camera, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,32 +31,60 @@ const TEXTURES = [
   { id: '8', url: '/textures/texture_8.jpg', name: 'Texture 8' },
 ];
 
+// Detect if device likely has front/back cameras (mobile/tablet)
+const hasMultipleCameras = (): boolean => {
+  // Check for touch capability (mobile/tablet indicator)
+  const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+  // Check for mobile user agent patterns
+  const mobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  // Assume device has multiple cameras if it's touch-enabled or mobile UA
+  return hasTouch || mobileUserAgent;
+};
+
 export default function Capture() {
   const [cameraType, setCameraType] = useState<'front' | 'back' | null>(null);
   const [loading, setLoading] = useState(false);
   const [streamId, setStreamId] = useState<string | null>(null);
   const [playbackId, setPlaybackId] = useState<string | null>(null);
   const [whipUrl, setWhipUrl] = useState<string | null>(null);
-  
+  const [autoStartChecked, setAutoStartChecked] = useState(false);
+
   const [prompt, setPrompt] = useState('');
   const [selectedTexture, setSelectedTexture] = useState<string | null>(null);
   const [textureWeight, setTextureWeight] = useState([0.5]);
   const [creativity, setCreativity] = useState([5]);
   const [quality, setQuality] = useState([0.4]);
-  
+
   const [recording, setRecording] = useState(false);
   const [recordStartTime, setRecordStartTime] = useState<number | null>(null);
-  
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const sourceVideoRef = useRef<HTMLVideoElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
-  
+
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  // Auto-start camera on desktop (non-mobile devices)
+  useEffect(() => {
+    if (!autoStartChecked && cameraType === null && !loading) {
+      const shouldAutoStart = !hasMultipleCameras();
+      if (shouldAutoStart) {
+        setAutoStartChecked(true);
+        // Desktop device - auto-start with default camera
+        selectCamera('front');
+      } else {
+        setAutoStartChecked(true);
+      }
+    }
+  }, [autoStartChecked, cameraType, loading]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -66,11 +95,11 @@ export default function Capture() {
 
   const selectCamera = async (type: 'front' | 'back') => {
     setCameraType(type);
-    const randomPrompt = type === 'front' 
+    const randomPrompt = type === 'front'
       ? FRONT_PROMPTS[Math.floor(Math.random() * FRONT_PROMPTS.length)]
       : BACK_PROMPTS[Math.floor(Math.random() * BACK_PROMPTS.length)];
     setPrompt(randomPrompt);
-    
+
     await initializeStream(type);
   };
 
@@ -91,7 +120,7 @@ export default function Capture() {
 
       // Start WebRTC publishing
       await startWebRTCPublish(streamData.whip_url, type);
-      
+
       // Save session to database
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -130,7 +159,7 @@ export default function Capture() {
   const startWebRTCPublish = async (whipUrl: string, type: 'front' | 'back') => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
+        video: {
           facingMode: type === 'front' ? 'user' : 'environment',
           width: 512,
           height: 512,
@@ -210,7 +239,7 @@ export default function Capture() {
 
   const calculateTIndexList = (creativityVal: number, qualityVal: number): number[] => {
     let baseIndices: number[];
-    
+
     if (qualityVal < 0.25) {
       baseIndices = [6];
     } else if (qualityVal < 0.50) {
@@ -298,42 +327,78 @@ export default function Capture() {
   }, [prompt, selectedTexture, textureWeight, creativity, quality]);
 
   if (!cameraType) {
+    // Show loading state while auto-starting on desktop
+    if (loading) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
+          <div className="max-w-md w-full text-center space-y-8">
+            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+            <p className="text-muted-foreground">Starting camera...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Camera selection screen (only shown on mobile/tablet devices)
+    const showMultipleCameras = hasMultipleCameras();
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
         <div className="max-w-md w-full text-center space-y-8">
           <div>
-            <h1 className="text-3xl font-bold gradient-text mb-2">Choose Camera</h1>
-            <p className="text-muted-foreground">Select which camera to use</p>
+            <h1 className="text-3xl font-bold gradient-text mb-2">
+              {showMultipleCameras ? 'Choose Camera' : 'Start Camera'}
+            </h1>
+            <p className="text-muted-foreground">
+              {showMultipleCameras ? 'Select which camera to use' : 'Start your webcam to begin'}
+            </p>
           </div>
 
           <div className="space-y-4">
-            <Button
-              onClick={() => selectCamera('front')}
-              className="w-full h-20 bg-card border-2 border-border hover:border-primary transition-smooth"
-              variant="outline"
-            >
-              <div className="flex items-center gap-4">
-                <Camera className="w-8 h-8 text-primary" />
-                <div className="text-left">
-                  <div className="font-semibold">Front Camera</div>
-                  <div className="text-sm text-muted-foreground">Selfie mode</div>
-                </div>
-              </div>
-            </Button>
+            {showMultipleCameras ? (
+              <>
+                <Button
+                  onClick={() => selectCamera('front')}
+                  className="w-full h-20 bg-card border-2 border-border hover:border-primary transition-smooth"
+                  variant="outline"
+                >
+                  <div className="flex items-center gap-4">
+                    <Camera className="w-8 h-8 text-primary" />
+                    <div className="text-left">
+                      <div className="font-semibold">Front Camera</div>
+                      <div className="text-sm text-muted-foreground">Selfie mode</div>
+                    </div>
+                  </div>
+                </Button>
 
-            <Button
-              onClick={() => selectCamera('back')}
-              className="w-full h-20 bg-card border-2 border-border hover:border-primary transition-smooth"
-              variant="outline"
-            >
-              <div className="flex items-center gap-4">
-                <Camera className="w-8 h-8 text-accent" />
-                <div className="text-left">
-                  <div className="font-semibold">Back Camera</div>
-                  <div className="text-sm text-muted-foreground">Environment mode</div>
+                <Button
+                  onClick={() => selectCamera('back')}
+                  className="w-full h-20 bg-card border-2 border-border hover:border-primary transition-smooth"
+                  variant="outline"
+                >
+                  <div className="flex items-center gap-4">
+                    <Camera className="w-8 h-8 text-accent" />
+                    <div className="text-left">
+                      <div className="font-semibold">Back Camera</div>
+                      <div className="text-sm text-muted-foreground">Environment mode</div>
+                    </div>
+                  </div>
+                </Button>
+              </>
+            ) : (
+              <Button
+                onClick={() => selectCamera('front')}
+                className="w-full h-20 bg-gradient-to-r from-primary to-accent text-white glow-primary"
+              >
+                <div className="flex items-center gap-4">
+                  <Camera className="w-8 h-8" />
+                  <div className="text-left">
+                    <div className="font-semibold text-lg">Start Webcam</div>
+                    <div className="text-sm opacity-90">Begin recording</div>
+                  </div>
                 </div>
-              </div>
-            </Button>
+              </Button>
+            )}
           </div>
         </div>
       </div>
