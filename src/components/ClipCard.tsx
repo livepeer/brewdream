@@ -30,12 +30,13 @@ export function ClipCard({ clip }: ClipCardProps) {
       <Link to={`/clip/${clip.id}`} className="block">
         {/* Poster Image */}
         <div className="relative aspect-[9/16] overflow-hidden">
-          <img
-            src={`https://lvpr.tv/?v=${clip.asset_playback_id}`}
-            alt={clip.prompt}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            loading="lazy"
-          />
+        <img
+          src={`https://lvpr.tv/?v=${clip.asset_playback_id}`}
+          alt={clip.prompt}
+          onError={(e) => (e.currentTarget.src = '/placeholder.svg')}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          loading="lazy"
+        />
 
           {/* Overlay on hover */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
