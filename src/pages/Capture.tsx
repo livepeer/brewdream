@@ -79,7 +79,7 @@ export default function Capture() {
     try {
       // Create Daydream stream
       const { data: streamData, error: streamError } = await supabase.functions.invoke('daydream-stream', {
-        body: { pipeline_id: 'your_pipeline_id' } // TODO: Replace with actual pipeline ID
+        body: { pipeline_id: 'pip_SDXL-turbo' }
       });
 
       if (streamError) throw streamError;
