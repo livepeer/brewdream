@@ -3,10 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Camera, Loader2, Sparkles } from 'lucide-react';
+import { Camera, ImageOff, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
 
 const FRONT_PROMPTS = [
   "studio ghibli portrait, soft rim light",
@@ -21,14 +26,46 @@ const BACK_PROMPTS = [
 ];
 
 const TEXTURES = [
-  { id: '1', url: '/textures/texture_1.jpg', name: 'Texture 1' },
-  { id: '2', url: '/textures/texture_2.jpg', name: 'Texture 2' },
-  { id: '3', url: '/textures/texture_3.jpg', name: 'Texture 3' },
-  { id: '4', url: '/textures/texture_4.jpg', name: 'Texture 4' },
-  { id: '5', url: '/textures/texture_5.jpg', name: 'Texture 5' },
-  { id: '6', url: '/textures/texture_6.jpg', name: 'Texture 6' },
-  { id: '7', url: '/textures/texture_7.jpg', name: 'Texture 7' },
-  { id: '8', url: '/textures/texture_8.jpg', name: 'Texture 8' },
+  {
+    id: 'lava',
+    url: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/volcanic_rock_tiles/volcanic_rock_tiles_diff_1k.jpg',
+    name: 'Lava / Volcanic Rock (PH 1K)'
+  },
+  {
+    id: 'galaxy_orion',
+    url: 'https://science.nasa.gov/wp-content/uploads/2023/04/orion-nebula-xlarge_web-jpg.webp',
+    name: 'Galaxy / Orion Nebula (NASA)'
+  },
+  {
+    id: 'dragon_scales',
+    url: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_tiles/roof_tiles_diff_1k.jpg',
+    name: 'Dragon Scales (Roof Tiles, PH 1K)'
+  },
+  {
+    id: 'water_ripples',
+    url: 'https://texturelabs.org/wp-content/uploads/2021/03/Texturelabs_Water_144.jpg',
+    name: 'Water Ripples (TextureLabs)'
+  },
+  {
+    id: 'lightning',
+    url: 'https://opengameart.org/sites/default/files/l1.png',
+    name: 'Lightning Bolt (OGA PNG)'
+  },
+  {
+    id: 'sand_dunes',
+    url: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_sand/aerial_sand_diff_1k.jpg',
+    name: 'Sand Dunes (PH 1K)'
+  },
+  {
+    id: 'sand_dunes_2',
+    url: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_beach_01/aerial_beach_01_diff_1k.jpg',
+    name: 'Beach Ripples (PH 1K)'
+  },
+  {
+    id: 'foam_ocean',
+    url: 'https://ambientcg.com/getsingle?file=Foam003_1K-JPG_Color.jpg',
+    name: 'Ocean Foam (ambientCG 1K)'
+  }
 ];
 
 // Detect if device likely has front/back cameras (mobile/tablet)
@@ -68,9 +105,9 @@ export default function Capture() {
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
+  // useEffect(() => {
+  //   checkAuth();
+  // }, []);
 
   // Auto-start camera on desktop (non-mobile devices)
   useEffect(() => {
@@ -343,44 +380,44 @@ export default function Capture() {
     const showMultipleCameras = hasMultipleCameras();
 
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-neutral-950 text-neutral-200">
         <div className="max-w-md w-full text-center space-y-8">
           <div>
-            <h1 className="text-3xl font-bold gradient-text mb-2">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-neutral-100 to-neutral-400 bg-clip-text text-transparent mb-2">
               {showMultipleCameras ? 'Choose Camera' : 'Start Camera'}
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-neutral-400">
               {showMultipleCameras ? 'Select which camera to use' : 'Start your webcam to begin'}
             </p>
           </div>
-
+    
           <div className="space-y-4">
             {showMultipleCameras ? (
               <>
                 <Button
                   onClick={() => selectCamera('front')}
-                  className="w-full h-20 bg-card border-2 border-border hover:border-primary transition-smooth"
+                  className="w-full h-20 bg-neutral-900 border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 transition-all duration-200"
                   variant="outline"
                 >
                   <div className="flex items-center gap-4">
-                    <Camera className="w-8 h-8 text-primary" />
+                    <Camera className="w-8 h-8 text-neutral-300" />
                     <div className="text-left">
-                      <div className="font-semibold">Front Camera</div>
-                      <div className="text-sm text-muted-foreground">Selfie mode</div>
+                      <div className="font-semibold text-neutral-100">Front Camera</div>
+                      <div className="text-sm text-neutral-400">Selfie mode</div>
                     </div>
                   </div>
                 </Button>
-
+    
                 <Button
                   onClick={() => selectCamera('back')}
-                  className="w-full h-20 bg-card border-2 border-border hover:border-primary transition-smooth"
+                  className="w-full h-20 bg-neutral-900 border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 transition-all duration-200"
                   variant="outline"
                 >
                   <div className="flex items-center gap-4">
-                    <Camera className="w-8 h-8 text-accent" />
+                    <Camera className="w-8 h-8 text-neutral-300" />
                     <div className="text-left">
-                      <div className="font-semibold">Back Camera</div>
-                      <div className="text-sm text-muted-foreground">Environment mode</div>
+                      <div className="font-semibold text-neutral-100">Back Camera</div>
+                      <div className="text-sm text-neutral-400">Environment mode</div>
                     </div>
                   </div>
                 </Button>
@@ -388,7 +425,7 @@ export default function Capture() {
             ) : (
               <Button
                 onClick={() => selectCamera('front')}
-                className="w-full h-20 bg-gradient-to-r from-primary to-accent text-white glow-primary"
+                className="w-full h-20 bg-gradient-to-r from-primary to-accent text-white transition-all duration-200"
               >
                 <div className="flex items-center gap-4">
                   <Camera className="w-8 h-8" />
@@ -406,10 +443,10 @@ export default function Capture() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
+    <div className="min-h-screen bg-neutral-950 text-neutral-200 p-4">
       <div className="max-w-2xl mx-auto space-y-4">
-        {/* Main Video Output (Square 512x512) */}
-        <div className="relative aspect-square bg-card rounded-3xl overflow-hidden border border-border">
+        {/* Main Video Output */}
+        <div className="relative aspect-square bg-neutral-950 rounded-3xl overflow-hidden border border-neutral-900 shadow-lg">
           {playbackId ? (
             <video
               ref={videoRef}
@@ -421,7 +458,7 @@ export default function Capture() {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <Loader2 className="w-12 h-12 animate-spin text-primary" />
+              <Loader2 className="w-12 h-12 animate-spin text-neutral-400" />
             </div>
           )}
 
@@ -438,58 +475,103 @@ export default function Capture() {
         </div>
 
         {/* Controls */}
-        <div className="bg-card rounded-3xl p-6 border border-border space-y-4">
+        <div className="bg-neutral-950 rounded-3xl p-6 border border-neutral-800 space-y-4 shadow-inner">
           <div>
-            <label className="text-sm font-medium mb-2 block">Prompt</label>
+            <label className="text-sm font-medium mb-2 block text-neutral-300">Prompt</label>
             <Input
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe your AI effect..."
-              className="bg-background border-border"
+              className="bg-neutral-950 border-neutral-800 focus:border-neutral-600 focus:ring-0 text-neutral-100 placeholder:text-neutral-500"
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">Texture</label>
-            <div className="grid grid-cols-4 gap-2">
-              <Button
-                variant={selectedTexture === null ? "default" : "outline"}
-                onClick={() => setSelectedTexture(null)}
-                className="aspect-square"
-              >
-                None
-              </Button>
-              {TEXTURES.map((texture) => (
-                <Button
-                  key={texture.id}
-                  variant={selectedTexture === texture.id ? "default" : "outline"}
-                  onClick={() => setSelectedTexture(texture.id)}
-                  className="aspect-square p-0 overflow-hidden"
+            <label className="text-sm font-medium mb-2 block text-neutral-300">
+              Texture
+            </label>
+
+            <div className="flex items-center gap-4">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2 bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 !w-10 !h-10 rounded-full overflow-hidden px-0 py-0 w-full sm:w-auto"
+                  >
+                    {selectedTexture ? (
+                      <>
+                        <img
+                          src={TEXTURES.find((t) => t.id === selectedTexture)?.url}
+                          alt="Selected texture"
+                          className="w-8 h-8 object-cover rounded"
+                        />
+                       
+                      </>
+                      ) : (
+                        <ImageOff className="w-5 h-5 text-neutral-400" />
+                      )}
+                  </Button>
+                </PopoverTrigger>
+
+                <PopoverContent
+                  align="start"
+                  sideOffset={8}
+                  className="w-[90vw] sm:w-80 bg-neutral-900 border border-neutral-800 rounded-2xl shadow-xl p-4"
                 >
-                  <img src={texture.url} alt={texture.name} className="w-full h-full object-cover" />
-                </Button>
-              ))}
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                    <Button
+                      onClick={() => setSelectedTexture(null)}
+                      variant={selectedTexture === null ? "default" : "outline"}
+                      className={`aspect-square ${
+                        selectedTexture === null
+                          ? "bg-neutral-800 text-neutral-100"
+                          : "bg-neutral-950 border-neutral-800 hover:border-neutral-600"
+                      }`}
+                    >
+                      None
+                    </Button>
+                    {TEXTURES.map((texture) => (
+                      <Button
+                        key={texture.id}
+                        onClick={() => setSelectedTexture(texture.id)}
+                        variant={selectedTexture === texture.id ? "default" : "outline"}
+                        className={`aspect-square p-0 overflow-hidden ${
+                          selectedTexture === texture.id
+                            ? "ring-2 ring-neutral-400"
+                            : "border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850"
+                        }`}
+                      >
+                        <img
+                          src={texture.url}
+                          alt={texture.name}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      </Button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {selectedTexture && (
+                <div className="flex-1">
+                  <label className="text-sm font-medium block mb-1 text-neutral-300">
+                    Strength: {textureWeight[0].toFixed(2)}
+                  </label>
+                  <Slider
+                    value={textureWeight}
+                    onValueChange={setTextureWeight}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    className="w-full accent-neutral-400"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          {selectedTexture && (
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Texture Weight: {textureWeight[0].toFixed(2)}
-              </label>
-              <Slider
-                value={textureWeight}
-                onValueChange={setTextureWeight}
-                min={0}
-                max={1}
-                step={0.01}
-                className="w-full"
-              />
-            </div>
-          )}
-
           <div>
-            <label className="text-sm font-medium mb-2 block">
+            <label className="text-sm font-medium mb-2 block text-neutral-300">
               Creativity: {creativity[0].toFixed(1)}
             </label>
             <Slider
@@ -498,12 +580,12 @@ export default function Capture() {
               min={1}
               max={10}
               step={0.1}
-              className="w-full"
+              className="w-full accent-neutral-400"
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">
+            <label className="text-sm font-medium mb-2 block text-neutral-300">
               Quality: {quality[0].toFixed(2)}
             </label>
             <Slider
@@ -512,7 +594,7 @@ export default function Capture() {
               min={0}
               max={1}
               step={0.01}
-              className="w-full"
+              className="w-full accent-neutral-400"
             />
           </div>
         </div>
@@ -524,19 +606,21 @@ export default function Capture() {
           onTouchStart={startRecording}
           onTouchEnd={stopRecording}
           disabled={loading || !playbackId}
-          className="w-full h-16 bg-gradient-to-r from-primary to-accent text-white glow-primary"
+          className="w-full h-16 bg-gradient-to-r from-neutral-200 to-neutral-500 text-neutral-900 font-semibold rounded-2xl hover:from-neutral-300 hover:to-neutral-600 transition-all duration-200"
         >
           {recording ? (
             <span className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded-full bg-red-500 animate-pulse" />
-              Recording... ({recordStartTime ? ((Date.now() - recordStartTime) / 1000).toFixed(1) : 0}s)
+              <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+              Recording... (
+              {recordStartTime ? ((Date.now() - recordStartTime) / 1000).toFixed(1) : 0}
+              s)
             </span>
           ) : loading ? (
             <Loader2 className="w-6 h-6 animate-spin" />
           ) : (
             <span className="flex items-center gap-2">
-              <Sparkles className="w-6 h-6" />
-              Hold to Record (3-10s)
+              <Sparkles className="w-6 h-6 text-neutral-900" />
+              Hold to Record (3–10s)
             </span>
           )}
         </Button>

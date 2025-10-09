@@ -43,11 +43,13 @@ export function Header({ isAuthenticated = false }: HeaderProps) {
           <Button
             size="sm"
             className="bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white hover:scale-105"
-            onClick={handleRecordClick}
+            asChild
             disabled={isRecording}
           >
-            <Video className="h-4 w-4" />
-            {isRecording ? "Recording..." : "Record Clip"}
+            <Link to={isAuthenticated ? "/capture" : "/login"}>
+              <Video className="h-4 w-4" />
+              {isRecording ? "Recording..." : "Record Clip"}
+            </Link>
           </Button>
         </div>
       </div>

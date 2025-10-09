@@ -195,8 +195,14 @@ export default function ClipView() {
               </p>
             </motion.div>
 
-            {/* Actions */}
-            <motion.div
+         
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+
+               {/* Actions */}
+               <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.4 }}
@@ -214,18 +220,12 @@ export default function ClipView() {
 
               <Button variant="outline" size="lg" onClick={shareToTwitter} className="gap-2 bg-transparent">
                 <Share2 className="h-5 w-5" />
-                Share
               </Button>
 
               <Button variant="outline" size="lg" className="gap-2 bg-transparent">
                 <Download className="h-5 w-5" />
-                Download
               </Button>
             </motion.div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
             {/* Coffee Ticket Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -251,7 +251,7 @@ export default function ClipView() {
                   <Button
                     onClick={generateTicket}
                     disabled={generatingTicket}
-                    className="w-full gap-2"
+                    className="w-full gap-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200"
                   >
                     {generatingTicket ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -264,19 +264,7 @@ export default function ClipView() {
               )}
             </motion.div>
 
-            {/* Back to Gallery */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.4 }}
-            >
-              <Link to="/">
-                <Button variant="outline" className="w-full gap-2">
-                  <Home className="w-4 h-4" />
-                  Back to Gallery
-                </Button>
-              </Link>
-            </motion.div>
+         
           </div>
         </div>
       </div>
