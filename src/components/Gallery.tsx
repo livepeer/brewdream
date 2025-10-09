@@ -58,7 +58,7 @@ export function Gallery() {
               <p className="mb-4 text-sm font-medium uppercase tracking-wider text-muted-foreground">
                 Powered by Daydream
               </p>
-              <h1 className="text-balance mb-6 bg-gradient-to-r from-foreground via-foreground/80 to-foreground/40 bg-clip-text text-5xl font-extrabold text-transparent md:text-6xl">Create your <br /> brewdream</h1>
+              <h1 className="text-balance mb-6 bg-gradient-to-r from-foreground via-foreground/80 to-foreground/40 bg-clip-text text-5xl font-extrabold text-transparent md:text-6xl">Brew your dream</h1>
               <p className="mx-auto max-w-2xl text-balance text-lg text-muted-foreground">
                 Create a clip and show it at the booth to win a{" "}
                 <strong className="font-bold text-foreground">free coffee</strong>. Share your creativity and get
@@ -99,9 +99,7 @@ export function Gallery() {
               Powered by <img src="/dd-logo.png" alt="Daydream" className="inline-block h-[2em] w-auto align-baseline mx-[2px] pl-2 pt-3" /> Daydream
             </p>
             <h1 className="text-balance mb-6 bg-gradient-to-r from-foreground via-foreground/80 to-foreground/40 bg-clip-text text-5xl font-extrabold text-transparent md:text-6xl">
-              Create your <br />
-           
-              brewdream
+              Brew your dream
             </h1>
             <p className="mx-auto max-w-2xl text-balance text-lg text-muted-foreground">
               Create a clip and show it at the booth to win a{" "}
