@@ -12,6 +12,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
+import { createDaydreamStream, startWhipPublish, updateDaydreamPrompts } from '@/lib/daydream';
 
 const FRONT_PROMPTS = [
   "studio ghibli portrait, soft rim light",
@@ -143,12 +144,8 @@ export default function Capture() {
   const initializeStream = async (type: 'front' | 'back') => {
     setLoading(true);
     try {
-      // Create Daydream stream
-      const { data: streamData, error: streamError } = await supabase.functions.invoke('daydream-stream', {
-        body: { pipeline_id: 'pip_SDXL-turbo' }
-      });
-
-      if (streamError) throw streamError;
+      // Create Daydream stream using the helper
+      const streamData = await createDaydreamStream();
 
       console.log('Stream created:', streamData);
       setStreamId(streamData.id);
@@ -209,39 +206,9 @@ export default function Capture() {
         sourceVideoRef.current.srcObject = stream;
       }
 
-      const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-      });
+      // Use the WHIP helper from daydream.ts
+      const pc = await startWhipPublish(whipUrl, stream);
       pcRef.current = pc;
-
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-      // Wait for ICE gathering to complete
-      await new Promise<void>((resolve) => {
-        if (pc.iceGatheringState === 'complete') {
-          resolve();
-        } else {
-          pc.addEventListener('icegatheringstatechange', () => {
-            if (pc.iceGatheringState === 'complete') {
-              resolve();
-            }
-          });
-        }
-      });
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      const response = await fetch(whipUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/sdp' },
-        body: offer.sdp,
-      });
-
-      if (!response.ok) throw new Error('WHIP publish failed');
-
-      const answerSdp = await response.text();
-      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
 
       console.log('WebRTC publishing started');
     } catch (error) {
@@ -257,13 +224,18 @@ export default function Capture() {
       // Calculate t_index_list based on creativity and quality
       const tIndexList = calculateTIndexList(creativity[0], quality[0]);
 
-      await supabase.functions.invoke('daydream-prompt', {
-        body: {
-          streamId,
-          prompt,
-          texture_weight: selectedTexture ? textureWeight[0] : 0,
-          t_index_list: tIndexList,
-        },
+      // Build the full prompt with texture if selected
+      const fullPrompt = selectedTexture 
+        ? `${prompt}, texture overlay weight ${textureWeight[0].toFixed(2)}`
+        : prompt;
+
+      // Use the StreamDiffusion prompt helper with proper params
+      await updateDaydreamPrompts(streamId, {
+        prompt: fullPrompt,
+        negative_prompt: 'blurry, low quality, flat, 2d, distorted',
+        t_index_list: tIndexList,
+        seed: 42,
+        num_inference_steps: 50,
       });
 
       toast({
@@ -454,13 +426,12 @@ export default function Capture() {
         </Button>
         <div className="relative aspect-square bg-neutral-950 rounded-3xl overflow-hidden border border-neutral-900 shadow-lg">
           {playbackId ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover"
+            <iframe
               src={`https://lvpr.tv/?v=${playbackId}&lowLatency=force`}
+              className="w-full h-full border-0"
+              allow="autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+              title="Daydream Output"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">

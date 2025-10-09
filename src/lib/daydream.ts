@@ -1,0 +1,165 @@
+/**
+ * Daydream Realtime Streaming Client
+ * 
+ * Provides helpers for creating streams, publishing via WHIP, and updating prompts.
+ * All API calls are proxied through Supabase edge functions to keep API keys server-side.
+ */
+
+import { supabase } from '@/integrations/supabase/client';
+
+export interface DaydreamStream {
+  id: string;
+  output_playback_id: string;
+  whip_url: string;
+}
+
+export interface StreamDiffusionParams {
+  model_id?: string;
+  prompt: string;
+  negative_prompt?: string;
+  num_inference_steps?: number;
+  seed?: number;
+  t_index_list?: number[];
+  controlnets?: Array<{
+    model_id: string;
+    preprocessor: string;
+    preprocessor_params?: Record<string, unknown>;
+    conditioning_scale: number;
+  }>;
+}
+
+/**
+ * Create a new Daydream stream with the StreamDiffusion pipeline
+ */
+export async function createDaydreamStream(): Promise<DaydreamStream> {
+  const { data, error } = await supabase.functions.invoke('daydream-stream', {
+    body: { pipeline_id: 'pip_qpUgXycjWF6YMeSL' }
+  });
+
+  if (error) throw error;
+  if (!data) throw new Error('No stream data returned');
+
+  return data as DaydreamStream;
+}
+
+/**
+ * Start WHIP publish from a MediaStream to Daydream
+ * Returns the RTCPeerConnection for later cleanup
+ */
+export async function startWhipPublish(
+  whipUrl: string,
+  stream: MediaStream
+): Promise<RTCPeerConnection> {
+  const pc = new RTCPeerConnection({
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  });
+
+  // Add all tracks from the stream
+  stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+  // Create offer
+  const offer = await pc.createOffer({
+    offerToReceiveAudio: false,
+    offerToReceiveVideo: false,
+  });
+  await pc.setLocalDescription(offer);
+
+  // Wait for ICE gathering to complete (non-trickle ICE)
+  await new Promise<void>((resolve) => {
+    if (pc.iceGatheringState === 'complete') {
+      resolve();
+    } else {
+      const checkState = () => {
+        if (pc.iceGatheringState === 'complete') {
+          pc.removeEventListener('icegatheringstatechange', checkState);
+          resolve();
+        }
+      };
+      pc.addEventListener('icegatheringstatechange', checkState);
+    }
+  });
+
+  // Send offer to WHIP endpoint
+  const offerSdp = pc.localDescription!.sdp!;
+  const response = await fetch(whipUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/sdp',
+    },
+    body: offerSdp,
+  });
+
+  if (!response.ok) {
+    throw new Error(`WHIP publish failed: ${response.status} ${response.statusText}`);
+  }
+
+  // Get answer SDP and set it
+  const answerSdp = await response.text();
+  await pc.setRemoteDescription({
+    type: 'answer',
+    sdp: answerSdp,
+  });
+
+  console.log('WHIP publish started successfully');
+  return pc;
+}
+
+/**
+ * Update StreamDiffusion prompts for a stream
+ * Sends the full params object as required by Daydream API
+ */
+export async function updateDaydreamPrompts(
+  streamId: string,
+  params: StreamDiffusionParams
+): Promise<void> {
+  const body = {
+    model_id: 'streamdiffusion',
+    pipeline: 'live-video-to-video',
+    params: {
+      model_id: params.model_id || 'stabilityai/sd-turbo',
+      prompt: params.prompt,
+      negative_prompt: params.negative_prompt || 'blurry, low quality, flat, 2d',
+      num_inference_steps: params.num_inference_steps || 50,
+      seed: params.seed || 42,
+      t_index_list: params.t_index_list || [6, 12, 18],
+      controlnets: params.controlnets || [
+        {
+          model_id: 'thibaud/controlnet-sd21-openpose-diffusers',
+          preprocessor: 'pose_tensorrt',
+          preprocessor_params: {},
+          conditioning_scale: 0,
+        },
+        {
+          model_id: 'thibaud/controlnet-sd21-hed-diffusers',
+          preprocessor: 'soft_edge',
+          preprocessor_params: {},
+          conditioning_scale: 0,
+        },
+        {
+          model_id: 'thibaud/controlnet-sd21-canny-diffusers',
+          preprocessor: 'canny',
+          preprocessor_params: { high_threshold: 200, low_threshold: 100 },
+          conditioning_scale: 0,
+        },
+        {
+          model_id: 'thibaud/controlnet-sd21-depth-diffusers',
+          preprocessor: 'depth_tensorrt',
+          preprocessor_params: {},
+          conditioning_scale: 0,
+        },
+        {
+          model_id: 'thibaud/controlnet-sd21-color-diffusers',
+          preprocessor: 'passthrough',
+          preprocessor_params: {},
+          conditioning_scale: 0,
+        },
+      ],
+    },
+  };
+
+  const { error } = await supabase.functions.invoke('daydream-prompt', {
+    body: { streamId, ...body },
+  });
+
+  if (error) throw error;
+}

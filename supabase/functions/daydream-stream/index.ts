@@ -17,7 +17,13 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    console.log('Creating Daydream stream with body:', body);
+    // Default to the StreamDiffusion pipeline if not specified
+    const requestBody = {
+      pipeline_id: body.pipeline_id || 'pip_qpUgXycjWF6YMeSL',
+      ...body,
+    };
+    
+    console.log('Creating Daydream stream with body:', requestBody);
 
     // Create stream via Daydream API
     const response = await fetch('https://api.daydream.live/v1/streams', {
@@ -26,7 +32,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${DAYDREAM_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(requestBody),
     });
 
     const data = await response.json();
@@ -40,7 +46,9 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify(data), {
+    // Return only the essential fields for security
+    const { id, output_playback_id, whip_url } = data;
+    return new Response(JSON.stringify({ id, output_playback_id, whip_url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: any) {

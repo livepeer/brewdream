@@ -16,17 +16,22 @@ serve(async (req) => {
       throw new Error('DAYDREAM_API_KEY is not configured');
     }
 
-    const { streamId, ...promptParams } = await req.json();
-    console.log('Sending prompt to stream:', streamId, promptParams);
+    const { streamId, ...promptBody } = await req.json();
+    if (!streamId) {
+      throw new Error('streamId is required');
+    }
 
-    // Send prompt to Daydream stream
+    console.log('Sending prompt to stream:', streamId, promptBody);
+
+    // Send the full prompt body as-is (current API behavior)
+    // The body should already be in the correct format from the client
     const response = await fetch(`https://api.daydream.live/beta/streams/${streamId}/prompts`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${DAYDREAM_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(promptParams),
+      body: JSON.stringify(promptBody),
     });
 
     const data = await response.json();
