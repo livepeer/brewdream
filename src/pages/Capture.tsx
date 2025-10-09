@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Camera, ImageOff, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Camera, ImageOff, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -446,6 +446,11 @@ export default function Capture() {
     <div className="min-h-screen bg-neutral-950 text-neutral-200 p-4">
       <div className="max-w-2xl mx-auto space-y-4">
         {/* Main Video Output */}
+
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-6">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
         <div className="relative aspect-square bg-neutral-950 rounded-3xl overflow-hidden border border-neutral-900 shadow-lg">
           {playbackId ? (
             <video
