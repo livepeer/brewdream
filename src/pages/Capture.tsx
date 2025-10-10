@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -12,8 +12,11 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
+import * as Player from '@livepeer/react/player';
+import { getSrc } from '@livepeer/react/external';
 import { createDaydreamStream, startWhipPublish, updateDaydreamPrompts } from '@/lib/daydream';
 import type { StreamDiffusionParams } from '@/lib/daydream';
+import { VideoRecorder, uploadToLivepeer, saveClipToDatabase } from '@/lib/recording';
 
 const FRONT_PROMPTS = [
   "studio ghibli portrait, soft rim light",
@@ -98,10 +101,16 @@ export default function Capture() {
 
   const [recording, setRecording] = useState(false);
   const [recordStartTime, setRecordStartTime] = useState<number | null>(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [captureSupported, setCaptureSupported] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const sourceVideoRef = useRef<HTMLVideoElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const recorderRef = useRef<VideoRecorder | null>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
+  const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -110,6 +119,24 @@ export default function Capture() {
   // useEffect(() => {
   //   checkAuth();
   // }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      navigate('/login');
+    }
+  };
+
+  const selectCamera = useCallback(async (type: 'front' | 'back') => {
+    setCameraType(type);
+    const randomPrompt = type === 'front'
+      ? FRONT_PROMPTS[Math.floor(Math.random() * FRONT_PROMPTS.length)]
+      : BACK_PROMPTS[Math.floor(Math.random() * BACK_PROMPTS.length)];
+    setPrompt(randomPrompt);
+
+    await initializeStream(type);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-start camera on desktop (non-mobile devices)
   useEffect(() => {
@@ -123,24 +150,7 @@ export default function Capture() {
         setAutoStartChecked(true);
       }
     }
-  }, [autoStartChecked, cameraType, loading]);
-
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      navigate('/login');
-    }
-  };
-
-  const selectCamera = async (type: 'front' | 'back') => {
-    setCameraType(type);
-    const randomPrompt = type === 'front'
-      ? FRONT_PROMPTS[Math.floor(Math.random() * FRONT_PROMPTS.length)]
-      : BACK_PROMPTS[Math.floor(Math.random() * BACK_PROMPTS.length)];
-    setPrompt(randomPrompt);
-
-    await initializeStream(type);
-  };
+  }, [autoStartChecked, cameraType, loading, selectCamera]);
 
   const initializeStream = async (type: 'front' | 'back') => {
     setLoading(true);
@@ -148,7 +158,6 @@ export default function Capture() {
       // Create Daydream stream using the helper
       const streamData = await createDaydreamStream();
 
-      console.log('Stream created:', streamData);
       setStreamId(streamData.id);
       setPlaybackId(streamData.output_playback_id);
       setWhipUrl(streamData.whip_url);
@@ -175,11 +184,6 @@ export default function Capture() {
           });
         }
       }
-
-      toast({
-        title: 'Stream ready!',
-        description: 'You can now start recording',
-      });
     } catch (error: unknown) {
       console.error('Error initializing stream:', error);
       toast({
@@ -192,9 +196,57 @@ export default function Capture() {
     }
   };
 
+  /**
+   * Mirror a video stream by rendering it through a canvas
+   * This ensures the mirrored stream goes to Daydream, so the output is naturally mirrored
+   */
+  const mirrorStream = (originalStream: MediaStream): MediaStream => {
+    // Create a hidden video element to play the original stream
+    const video = document.createElement('video');
+    video.srcObject = originalStream;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = true;
+    video.style.position = 'fixed';
+    video.style.top = '-9999px';
+    document.body.appendChild(video);
+
+    // Explicitly play the video
+    video.play().catch(err => console.error('Error playing video for mirroring:', err));
+
+    // Create a canvas to mirror the video
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d', { alpha: false })!;
+
+    // Start continuous mirroring loop
+    const mirror = () => {
+      if (video.readyState >= video.HAVE_CURRENT_DATA) {
+        // Clear and redraw with horizontal flip
+        ctx.setTransform(-1, 0, 0, 1, canvas.width, 0); // Flip horizontally
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      }
+      requestAnimationFrame(mirror);
+    };
+
+    // Start drawing immediately
+    mirror();
+
+    // Capture the mirrored stream from canvas (24 fps to match typical camera)
+    const mirroredVideoStream = canvas.captureStream(24);
+
+    // Add the original audio tracks to the mirrored stream
+    originalStream.getAudioTracks().forEach(track => {
+      mirroredVideoStream.addTrack(track);
+    });
+
+    return mirroredVideoStream;
+  };
+
   const startWebRTCPublish = async (whipUrl: string, type: 'front' | 'back') => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const originalStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: type === 'front' ? 'user' : 'environment',
           width: 512,
@@ -202,6 +254,9 @@ export default function Capture() {
         },
         audio: true,
       });
+
+      // Mirror the stream if using front camera
+      const stream = type === 'front' ? mirrorStream(originalStream) : originalStream;
 
       if (sourceVideoRef.current) {
         sourceVideoRef.current.srcObject = stream;
@@ -218,7 +273,7 @@ export default function Capture() {
     }
   };
 
-  const updatePrompt = async () => {
+  const updatePrompt = useCallback(async () => {
     if (!streamId) return;
 
     try {
@@ -283,7 +338,7 @@ export default function Capture() {
     } catch (error: unknown) {
       console.error('Error updating prompt:', error);
     }
-  };
+  }, [streamId, prompt, creativity, quality, selectedTexture, textureWeight]);
 
   const calculateTIndexList = (creativityVal: number, qualityVal: number): number[] => {
     let baseIndices: number[];
@@ -302,59 +357,151 @@ export default function Capture() {
     return baseIndices.map(idx => Math.max(0, Math.min(50, Math.round(idx * scale))));
   };
 
-  const startRecording = () => {
-    setRecording(true);
-    setRecordStartTime(Date.now());
+  const startRecording = async () => {
+    // Desktop mode: if already recording, ignore (stop will be called separately)
+    if (!isMobile && recording) {
+      return;
+    }
+
+    // Get the video element from the Livepeer Player
+    const playerVideo = playerContainerRef.current?.querySelector('video') as HTMLVideoElement;
+
+    if (!playerVideo) {
+      toast({
+        title: 'Error',
+        description: 'Video player not ready',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check if captureStream is supported
+    if (!VideoRecorder.isSupported(playerVideo)) {
+      setCaptureSupported(false);
+      toast({
+        title: 'Recording not supported',
+        description: 'Your browser does not support video capture',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const recorder = new VideoRecorder(playerVideo);
+      await recorder.start();
+
+      recorderRef.current = recorder;
+      setRecording(true);
+      setRecordStartTime(Date.now());
+
+      // Auto-stop at 10 seconds
+      autoStopTimerRef.current = setTimeout(() => {
+        stopRecording();
+      }, 10000);
+
+      console.log('Recording started');
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to start recording',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const toggleRecording = async () => {
+    if (recording) {
+      await stopRecording();
+    } else {
+      await startRecording();
+    }
   };
 
   const stopRecording = async () => {
-    if (!recordStartTime || !playbackId) return;
+    if (!recorderRef.current || !recordStartTime || !streamId) return;
 
-    const duration = Date.now() - recordStartTime;
-    const clampedDuration = Math.max(3000, Math.min(10000, duration));
+    // Clear auto-stop timer
+    if (autoStopTimerRef.current) {
+      clearTimeout(autoStopTimerRef.current);
+      autoStopTimerRef.current = null;
+    }
+
+    const recordingDuration = Date.now() - recordStartTime;
+
+    // Check minimum duration (3 seconds)
+    if (recordingDuration < 3000) {
+      setRecording(false);
+
+      // Stop and discard the recording
+      try {
+        await recorderRef.current.stop();
+      } catch (error) {
+        console.error('Error stopping recorder:', error);
+      }
+      recorderRef.current = null;
+
+      toast({
+        title: 'Recording too short',
+        description: 'Hold for at least 3 seconds to create a clip',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setRecording(false);
     setLoading(true);
 
     try {
-      // Create clip via Livepeer
-      const { data: clipData, error: clipError } = await supabase.functions.invoke('livepeer-clip', {
-        body: {
-          playbackId,
-          durationMs: clampedDuration,
-        },
+      // Stop the recorder and get the blob
+      const { blob, durationMs } = await recorderRef.current.stop();
+      recorderRef.current = null;
+
+      console.log('Recording stopped, uploading to Livepeer...');
+
+      toast({
+        title: 'Processing...',
+        description: 'Uploading your clip to Livepeer Studio',
       });
 
-      if (clipError) throw clipError;
+      // Upload to Livepeer Studio
+      const filename = `daydream-clip-${Date.now()}.webm`;
+      const { assetId, playbackId: assetPlaybackId, downloadUrl } = await uploadToLivepeer(blob, filename);
 
-      // Save clip to database
+      console.log('Upload complete, saving to database...');
+
+      // Get session ID
       const { data: sessionData } = await supabase
         .from('sessions')
         .select('id')
         .eq('stream_id', streamId)
         .single();
 
-      if (sessionData) {
-        const { data: clip } = await supabase.from('clips').insert({
-          session_id: sessionData.id,
-          asset_playback_id: clipData.playbackId,
-          asset_url: clipData.downloadUrl,
-          prompt,
-          texture_id: selectedTexture,
-          texture_weight: selectedTexture ? textureWeight[0] : null,
-          t_index_list: calculateTIndexList(creativity[0], quality[0]),
-          duration_ms: clampedDuration,
-        }).select().single();
-
-        if (clip) {
-          toast({
-            title: 'Clip created!',
-            description: 'Redirecting to share...',
-          });
-          navigate(`/clip/${clip.id}`);
-        }
+      if (!sessionData) {
+        throw new Error('Session not found');
       }
+
+      // Save to database
+      const clip = await saveClipToDatabase({
+        assetId,
+        playbackId: assetPlaybackId,
+        downloadUrl,
+        durationMs,
+        sessionId: sessionData.id,
+        prompt,
+        textureId: selectedTexture,
+        textureWeight: selectedTexture ? textureWeight[0] : null,
+        tIndexList: calculateTIndexList(creativity[0], quality[0]),
+      });
+
+      toast({
+        title: 'Clip created!',
+        description: 'Redirecting to your clip...',
+      });
+
+      navigate(`/clip/${clip.id}`);
     } catch (error: unknown) {
+      console.error('Error creating clip:', error);
       toast({
         title: 'Error creating clip',
         description: error instanceof Error ? error.message : String(error),
@@ -365,6 +512,37 @@ export default function Capture() {
     }
   };
 
+  const src = useMemo(() => {
+    if (!playbackId) {
+      return null;
+    }
+
+    // Try getSrc first (works for standard Livepeer playback IDs)
+    const result = getSrc(playbackId);
+
+    if (result && Array.isArray(result) && result.length > 0) {
+      return result;
+    }
+
+    // For Daydream streams, construct WebRTC source manually
+    // Daydream uses Livepeer infrastructure but may have different endpoints
+    const manualSrc = [
+      {
+        src: `https://livepeer.studio/webrtc/${playbackId}`,
+        mime: 'video/h264' as const,
+        type: 'webrtc' as const,
+      },
+      {
+        src: `https://livepeer.studio/hls/${playbackId}/index.m3u8`,
+        mime: 'application/vnd.apple.mpegurl' as const,
+        type: 'hls' as const,
+      },
+    ] as const;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return manualSrc as any;
+  }, [playbackId]);
+
   useEffect(() => {
     if (prompt && streamId) {
       const debounce = setTimeout(() => {
@@ -372,7 +550,47 @@ export default function Capture() {
       }, 500);
       return () => clearTimeout(debounce);
     }
-  }, [prompt, selectedTexture, textureWeight, creativity, quality]);
+  }, [prompt, selectedTexture, textureWeight, creativity, quality, streamId, updatePrompt]);
+
+  // Update recording timer display
+  useEffect(() => {
+    if (recording && recordStartTime) {
+      const interval = setInterval(() => {
+        setRecordingTime(Date.now() - recordStartTime);
+      }, 100); // Update every 100ms for smooth counter
+
+      return () => clearInterval(interval);
+    } else {
+      setRecordingTime(0);
+    }
+  }, [recording, recordStartTime]);
+
+  // Listen for video playback to enable recording
+  useEffect(() => {
+    if (playerContainerRef.current) {
+      const video = playerContainerRef.current.querySelector('video');
+      if (video) {
+        const handlePlay = () => setIsPlaying(true);
+        const handlePause = () => setIsPlaying(false);
+        const handleWaiting = () => setIsPlaying(false);
+
+        video.addEventListener('playing', handlePlay);
+        video.addEventListener('pause', handlePause);
+        video.addEventListener('waiting', handleWaiting);
+
+        // Check initial state
+        if (!video.paused && video.readyState >= 3) {
+          setIsPlaying(true);
+        }
+
+        return () => {
+          video.removeEventListener('playing', handlePlay);
+          video.removeEventListener('pause', handlePause);
+          video.removeEventListener('waiting', handleWaiting);
+        };
+      }
+    }
+  }, [playbackId, src]);
 
   if (!cameraType) {
     // Show loading state while auto-starting on desktop
@@ -463,17 +681,41 @@ export default function Capture() {
           Back
         </Button>
         <div className="relative aspect-square bg-neutral-950 rounded-3xl overflow-hidden border border-neutral-900 shadow-lg">
-          {playbackId ? (
-            <iframe
-              src={`https://lvpr.tv/?v=${playbackId}&lowLatency=force`}
-              className="w-full h-full border-0"
-              allow="autoplay; encrypted-media; picture-in-picture"
-              allowFullScreen
-              title="Daydream Output"
-            />
+          {playbackId && src ? (
+            <div
+              ref={playerContainerRef}
+              className="player-container w-full h-full [&_[data-radix-aspect-ratio-wrapper]]:!h-full [&_[data-radix-aspect-ratio-wrapper]]:!pb-0"
+              style={{ width: '100%', height: '100%', position: 'relative' }}
+            >
+              <Player.Root
+                src={src}
+                autoPlay
+                lowLatency="force"
+              >
+                <Player.Container
+                  className="w-full h-full"
+                  style={{ width: '100%', height: '100%', position: 'relative' }}
+                >
+                  <Player.Video
+                    className="w-full h-full"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                  <Player.LoadingIndicator>
+                    <div className="absolute inset-0 flex items-center justify-center bg-neutral-950/50">
+                      <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                    </div>
+                  </Player.LoadingIndicator>
+                </Player.Container>
+              </Player.Root>
+            </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Loader2 className="w-12 h-12 animate-spin text-neutral-400" />
+              {playbackId && !src && <p className="text-xs text-neutral-500 mt-2">Loading stream...</p>}
             </div>
           )}
 
@@ -488,6 +730,38 @@ export default function Capture() {
             />
           </div>
         </div>
+
+        {/* Record Button */}
+        {!captureSupported && (
+          <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-3 text-sm text-yellow-200">
+            ⚠️ Video capture not supported on this browser. Recording is disabled.
+          </div>
+        )}
+        <Button
+          onClick={isMobile ? undefined : toggleRecording}
+          onPointerDown={isMobile ? startRecording : undefined}
+          onPointerUp={isMobile ? stopRecording : undefined}
+          onPointerLeave={isMobile ? stopRecording : undefined}
+          disabled={loading || !playbackId || !captureSupported || !isPlaying}
+          className="w-full h-16 bg-gradient-to-r from-neutral-200 to-neutral-500 text-neutral-900 font-semibold rounded-2xl hover:from-neutral-300 hover:to-neutral-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {recording ? (
+            <span className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+              Recording... ({(recordingTime / 1000).toFixed(1)}s)
+            </span>
+          ) : loading || !isPlaying ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Starting stream...
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-neutral-900" />
+              {isMobile ? 'Hold to Brew' : 'Click to Start Brewing'}
+            </span>
+          )}
+        </Button>
 
         {/* Controls */}
         <div className="bg-neutral-950 rounded-3xl p-6 border border-neutral-800 space-y-4 shadow-inner">
@@ -613,32 +887,6 @@ export default function Capture() {
             />
           </div>
         </div>
-
-        {/* Record Button */}
-        <Button
-          onMouseDown={startRecording}
-          onMouseUp={stopRecording}
-          onTouchStart={startRecording}
-          onTouchEnd={stopRecording}
-          disabled={loading || !playbackId}
-          className="w-full h-16 bg-gradient-to-r from-neutral-200 to-neutral-500 text-neutral-900 font-semibold rounded-2xl hover:from-neutral-300 hover:to-neutral-600 transition-all duration-200"
-        >
-          {recording ? (
-            <span className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-              Recording... (
-              {recordStartTime ? ((Date.now() - recordStartTime) / 1000).toFixed(1) : 0}
-              s)
-            </span>
-          ) : loading ? (
-            <Loader2 className="w-6 h-6 animate-spin" />
-          ) : (
-            <span className="flex items-center gap-2">
-              <Sparkles className="w-6 h-6 text-neutral-900" />
-              Brew (3–10s)
-            </span>
-          )}
-        </Button>
       </div>
     </div>
   );

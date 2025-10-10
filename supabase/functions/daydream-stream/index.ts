@@ -22,7 +22,7 @@ serve(async (req) => {
       pipeline_id: body.pipeline_id || 'pip_qpUgXycjWF6YMeSL',
       ...body,
     };
-    
+
     console.log('Creating Daydream stream with body:', requestBody);
 
     // Create stream via Daydream API

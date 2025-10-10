@@ -43,15 +43,19 @@ src/
 ├── integrations/
 │   └── supabase/   # Supabase client & types
 ├── hooks/          # Custom React hooks (use-mobile, use-toast)
-└── lib/            # Utilities (cn helper)
+└── lib/            # Utilities (cn helper, recording, daydream)
+    ├── recording.ts    # VideoRecorder class, upload/save functions
+    └── daydream.ts     # Daydream stream & WHIP utilities
 
 supabase/
 ├── functions/      # Edge Functions (API proxy layer)
-│   ├── daydream-stream/    # Create Daydream AI stream
-│   ├── daydream-prompt/    # Update stream prompt/effects
-│   ├── livepeer-clip/      # Create clip from stream
-│   ├── generate-ticket/    # Generate coffee QR code
-│   └── send-auth-email/    # Custom OTP email template
+│   ├── daydream-stream/       # Create Daydream AI stream
+│   ├── daydream-prompt/       # Update stream prompt/effects
+│   ├── studio-request-upload/ # Request Livepeer upload URL
+│   ├── studio-asset-status/   # Poll Livepeer asset status
+│   ├── save-clip/             # Save clip metadata to DB
+│   ├── generate-ticket/       # Generate coffee QR code
+│   └── send-auth-email/       # Custom OTP email template
 └── migrations/     # Database schema
 ```
 
@@ -108,20 +112,50 @@ These are **non-negotiable** technical requirements:
    - WHIP protocol to publish to Daydream
    - PiP preview of source, main view shows AI output
 
-3. **AI Effect Controls** (Capture.tsx):
+3. **Playback Setup** (Capture.tsx):
+   - Uses Livepeer Player SDK v4 (`@livepeer/react/player`)
+   - Daydream playback IDs require manual src construction (getSrc doesn't recognize them):
+     ```typescript
+     const src = [
+       { src: `https://livepeer.studio/webrtc/${playbackId}`, mime: 'video/h264', type: 'webrtc' },
+       { src: `https://livepeer.studio/hls/${playbackId}/index.m3u8`, mime: 'application/vnd.apple.mpegurl', type: 'hls' }
+     ];
+     ```
+   - Front camera mirroring: Stream is mirrored **at the source** using canvas before sending to Daydream
+     - Original stream → Canvas with `scaleX(-1)` → `captureStream()` → Mirrored MediaStream
+     - Mirrored stream sent to both Daydream and PiP preview
+     - Daydream processes mirrored input → Output is naturally mirrored
+     - No CSS transforms needed on output (keeps UI elements like loading spinners readable)
+
+4. **AI Effect Controls** (Capture.tsx):
    - **Prompt**: Text description of style
    - **Texture**: Optional image overlay (8 presets)
    - **Creativity** (1-10): Controls denoise strength via `t_index_list`
    - **Quality** (0-1): Number of diffusion steps (0.25=1 step, 1.0=4 steps)
    - **t_index_list**: `[6, 12, 18, 24]` scaled by creativity (formula: `2.62 - 0.132 * creativity`)
 
-4. **Clip Creation** (`livepeer-clip`):
-   - Record 3-10s (hold button)
-   - Creates clip from last N seconds of stream
-   - Polls asset until ready
-   - Saves to database with metadata
+5. **Clip Recording** (recording.ts + Capture.tsx):
+   - **Button behavior**: Desktop (click toggle), Mobile (press & hold)
+   - Button enabled only when video is playing (listens to video events)
+   - **Capture**: `videoElement.captureStream()` gets live MediaStream from rendered video
+   - **Record**: MediaRecorder with 100ms timeslice collects video chunks
+   - **Duration**: 3-10s enforced (auto-stop at 10s, cancel if <3s)
+   - **Timer**: Updates every 100ms during recording for smooth counter
+   - Records the AI-processed output (not the original camera feed)
 
-5. **Share & Reward** (ClipView.tsx):
+6. **Clip Upload** (recording.ts):
+   - Request pre-signed upload URL (`studio-request-upload`)
+   - PUT blob directly to Livepeer upload URL
+   - Poll asset status every 2s (`studio-asset-status`) until ready (max 2min)
+   - Returns `assetId`, `playbackId`, `downloadUrl`
+
+7. **Database Save** (recording.ts):
+   - Look up session ID from stream
+   - Save clip metadata via `save-clip` edge function
+   - Includes prompt, texture, creativity/quality params, duration
+   - Navigate to clip page
+
+8. **Share & Reward** (ClipView.tsx):
    - Share to X/Twitter with preset text
    - Generate unique coffee ticket code
    - Display ticket as large text + QR data
@@ -188,10 +222,14 @@ These are **non-negotiable** technical requirements:
 ### Livepeer Studio API
 - **Base URL**: `https://livepeer.studio/api`
 - **Endpoints**:
-  - `POST /clip` - Create clip from playback
+  - `POST /asset/request-upload` - Get pre-signed upload URL
   - `GET /asset/:id` - Check asset status
+  - `PUT {uploadUrl}` - Direct upload (from pre-signed URL)
 - **Auth**: Bearer token (`LIVEPEER_STUDIO_API_KEY`)
-- **Playback**: `https://lvpr.tv/?v={playbackId}&lowLatency=force`
+- **Playback**:
+  - WebRTC: `https://livepeer.studio/webrtc/{playbackId}`
+  - HLS: `https://livepeer.studio/hls/{playbackId}/index.m3u8`
+  - **Note**: Daydream playback IDs don't work with `getSrc()` helper, must construct manually
 
 ### Supabase Edge Functions
 All functions have `verify_jwt: false` (public access)
@@ -207,10 +245,24 @@ All functions have `verify_jwt: false` (public access)
 - Randomly assigns prompt based on camera type
 
 ### Recording Mechanics
-- **Hold to record**: Mouse down/up or touch start/end
-- **Duration**: 3-10s enforced (clamped client-side)
-- **Real-time counter**: Shows elapsed time during recording
-- **Button states**: Loading, Recording (with pulse), Ready
+- **Desktop**: Click to start, click to stop (toggle mode)
+- **Mobile**: Press and hold to record, release to stop
+- **Duration**: 3-10s enforced
+  - Auto-stop at 10 seconds
+  - Cancel if released before 3 seconds (shows toast)
+- **Real-time counter**: Updates every 100ms during recording
+- **Button states**:
+  - Disabled when stream not playing
+  - "Starting stream..." when loading
+  - "Hold to Brew" / "Tap to Brew" when ready
+  - "Recording... (X.Xs)" during capture
+- **Enabled only when playing**: Listens to video `playing`/`pause`/`waiting` events
+- **Recording technique**:
+  - `videoElement.captureStream()` captures rendered video frames from Livepeer Player
+  - `MediaRecorder` with 100ms timeslice records to WebM
+  - Collects chunks in memory, creates blob on stop
+  - Captures AI-processed output (not original camera feed)
+  - Recording captures naturally mirrored output (mirroring applied at source, not via CSS)
 
 ### Prompt Customization
 - **Debounced updates**: 500ms delay on input change
@@ -299,6 +351,46 @@ SUPABASE_SERVICE_ROLE_KEY=...
 - Use shadcn/ui CLI: `npx shadcn@latest add [component]`
 - Components go to `src/components/ui/`
 - Import and use with custom classes
+
+### Recording Implementation Pattern
+**File**: `src/lib/recording.ts` (VideoRecorder class)
+
+```typescript
+// 1. Create recorder from video element
+const recorder = new VideoRecorder(videoElement);
+
+// 2. Start recording (captures MediaStream)
+await recorder.start();
+
+// 3. Stop recording (returns blob + duration)
+const { blob, durationMs } = await recorder.stop();
+
+// 4. Upload to Livepeer (3-step process)
+const { assetId, playbackId, downloadUrl } = await uploadToLivepeer(blob, filename);
+// - Requests pre-signed upload URL
+// - PUTs blob directly to URL
+// - Polls asset status until ready
+
+// 5. Save to database
+const clip = await saveClipToDatabase({ assetId, playbackId, ... });
+```
+
+**Key implementation notes**:
+- `captureStream()` must be called on the actual `<video>` DOM element (not iframe)
+- Front camera mirroring: Canvas-based stream manipulation before sending to Daydream
+  ```typescript
+  // Mirror at source (in startWebRTCPublish)
+  const mirrorStream = (originalStream: MediaStream): MediaStream => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+    ctx.scale(-1, 1); // Mirror horizontally
+    ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+    return canvas.captureStream(30); // + audio tracks
+  };
+  ```
+- Recording is of AI-processed output, not original camera feed
+- WebM format with 100ms timeslice for smooth capture
+- Maximum 2-minute polling for asset processing
 
 ## 🎯 Key Business Logic
 
@@ -425,6 +517,37 @@ navigate('/path');
 4. **Public Access**: All RLS policies allow public reads for clips/sessions
 5. **No Auth Required**: Edge functions have `verify_jwt: false` for simplicity
 6. **Single Stream**: User can only have one active stream at a time
+7. **Browser Recording**: Requires `captureStream()` support (Chrome/Edge/Firefox/Safari modern versions)
+8. **Video Element Access**: Must use Livepeer Player component (not iframe) for recording
+
+## 🐛 Known Issues & Workarounds
+
+### Camera Mirroring (✅ RESOLVED)
+**Solution**: Mirror the MediaStream **at the source** before sending to Daydream:
+- Original camera stream → Canvas with `scaleX(-1)` → `captureStream(30)` → Mirrored MediaStream
+- Mirrored stream sent to Daydream via WHIP
+- Daydream processes already-mirrored input
+- Output is naturally mirrored (no CSS transforms needed)
+- **Benefits**:
+  - Loading spinners and text remain readable (not flipped)
+  - Recording captures correctly mirrored video
+  - Works consistently across all browsers
+
+### Daydream Playback IDs Not Recognized
+**Issue**: `getSrc()` from `@livepeer/react/external` returns `null` for Daydream playback IDs.
+
+**Workaround**: Manually construct src array with WebRTC and HLS URLs:
+```typescript
+const src = [
+  { src: `https://livepeer.studio/webrtc/${playbackId}`, mime: 'video/h264', type: 'webrtc' },
+  { src: `https://livepeer.studio/hls/${playbackId}/index.m3u8`, mime: 'application/vnd.apple.mpegurl', type: 'hls' }
+];
+```
+
+### Video `object-fit: cover` Issues
+**Issue**: Getting video to properly fill square container with `object-fit: cover` proved challenging with complex CSS/player interactions.
+
+**Status**: Resolved by peer. May require specific CSS targeting of Livepeer Player internal elements.
 
 ## 📝 Coding Conventions
 
@@ -549,9 +672,17 @@ Avoid:
 **Fully implemented (✅):**
 - Email OTP auth (no X OAuth as per PRD optional clause)
 - Camera selector (front/back) with permission prompts
-- Live output (1:1 square) with PiP source preview
-- Prompt, Texture+Weight, Creativity, Quality controls
-- Hold-to-record (3-10s) → Livepeer asset creation
+- Live output (1:1 square) with PiP source preview via Livepeer Player SDK v4
+- Manual src construction for Daydream playback IDs
+- Prompt, Texture+Weight, Creativity, Quality controls with debounced updates
+- Recording with `captureStream()` + `MediaRecorder` (3-10s duration enforcement)
+- Desktop (click toggle) vs Mobile (press & hold) recording mechanics
+- Real-time recording counter (100ms updates)
+- Auto-stop at 10s, cancel if <3s
+- Front camera mirroring at source (canvas-based stream manipulation before Daydream)
+- Recording button enabled only when video is playing
+- Three-step upload to Livepeer Studio (request URL → PUT blob → poll status)
+- Clip metadata saved to database with all AI parameters
 - Share to X with default copy
 - Coffee QR display and DB storage
 - Gallery home with square grid
@@ -567,13 +698,23 @@ Avoid:
 - Email delivery of ticket (function exists but integration TBD)
 
 **Deviations from PRD (📝):**
-- Gallery shows video player instead of thumbnails (simpler, works for POC)
-- No X OAuth (per PRD: "optional if trivial; otherwise require email")
-- Ticket route simplified (QR shown on clip page only)
+- **Recording method**: Browser-side `captureStream()` + `MediaRecorder` instead of Livepeer Create Clip API
+  - **Rationale**: More reliable across network conditions, captures exact rendered frames, works with WebRTC-only playback
+  - **Trade-off**: Requires browser support for captureStream (widely supported in modern browsers)
+- **Playback src**: Manual src construction instead of using `getSrc()` helper
+  - **Rationale**: Daydream playback IDs not recognized by Livepeer's `getSrc()` utility
+- **Recording mechanics**: Different behavior for desktop vs mobile
+  - **Rationale**: Better UX - desktop users can multitask, mobile users get familiar "hold to record" pattern
+- **Camera mirroring**: Canvas-based stream manipulation before Daydream instead of CSS transforms
+  - **Rationale**: Ensures Daydream processes mirrored input, output is naturally mirrored, UI elements remain readable
+  - **Benefit**: More robust, no CSS transform issues, consistent across browsers
+- **Gallery**: Shows video player instead of thumbnails (simpler, works for POC)
+- **No X OAuth**: Per PRD optional clause ("optional if trivial; otherwise require email")
+- **Ticket route**: Simplified (QR shown on clip page only)
 
 ---
 
-**Last Updated**: 2025-10-09 (Updated with PRD alignment)
+**Last Updated**: 2025-10-10 (Canvas-based mirroring at source for natural selfie mode)
 **Project Status**: Active development for Livepeer × Daydream Summit (Brewdream)
 **Maintainer Note**: Keep this file concise but comprehensive. Every section should answer "what do I need to know to work on this?" Always check PRD for feature requirements before implementing.
 

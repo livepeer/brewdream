@@ -5,9 +5,10 @@ Mobile-first microsite for the **Realtime AI Video Summit (Open Source AI Week)*
 ## Hard constraints
 
 - **No client-side API keys.** All Daydream + Livepeer Studio calls go through **Supabase Edge Functions**. Secrets via `Deno.env.get`. CORS locked to our origin.
-- **WebRTC only** for live playback (`lowLatency="force"` / `lvpr.tv …&lowLatency=force`). **No HLS fallback**.
-- **In-browser WHIP publish** to Daydream’s `whip_url` (mobile, with mic audio).
-- **Clips must become Livepeer Studio Assets** (for gallery). Use **Create Clip API** from playbackId.
+- **WebRTC only** for live playback (`lowLatency="force"`). **No HLS fallback** (HLS only as fallback for player, not for user selection).
+- **In-browser WHIP publish** to Daydream's `whip_url` (mobile, with mic audio).
+- **Clips must become Livepeer Studio Assets** (for gallery). Record browser video using `captureStream()` + `MediaRecorder`, then upload to Livepeer Studio.
+- **Browser recording requirements**: Modern browsers with `HTMLMediaElement.captureStream()` and `MediaRecorder` support (Chrome/Edge/Firefox/Safari recent versions).
 
 ---
 
@@ -51,8 +52,13 @@ Mobile-first microsite for the **Realtime AI Video Summit (Open Source AI Week)*
 
 - **Create stream** → get `{ id, output_playback_id, whip_url }` via **Edge Function** proxy call.
 - **Publish** with **browser WHIP** to `whip_url`: `RTCPeerConnection`, add camera + mic tracks, **non-trickle** ICE (wait for ICE complete), then POST offer SDP (`content-type: application/sdp`), set remote answer. (If Daydream’s WHIP doesn’t require redirect, skip Livepeer “SDP host” preflight.)
-- **Play output** with **Livepeer Player** or **lvpr.tv iframe** set to **1:1 aspect** & `lowLatency=force`. Prefer Player component in-app for more control; iframe is acceptable if simpler.
-- **Create clip** (server): **Livepeer Create Clip API** with `{playbackId, startTime, endTime}`; startTime = `now - durationMs`, endTime = `now`. Poll **asset status** until `ready`; store `asset.playbackId` and `asset.downloadUrl` (if available). **Note:** Livepeer docs describe using program-date-time from HLS; for WebRTC-only views, we approximate `now`based range; this works in practice when the origin stream is live. If API rejects timestamps, fallback to **fixed 10s** ending `Date.now() - 2s`.
+- **Play output** with **Livepeer Player SDK v4** (`@livepeer/react/player`) set to **1:1 aspect** & `lowLatency=force`. **Must use Player component** (not iframe) because we need to capture the video element for recording.
+- **Create clip** (browser + server): **Browser-side recording** using `HTMLMediaElement.captureStream()` + `MediaRecorder` API to record the rendered video output. Upload recorded blob to **Livepeer Studio** via:
+    1. Request pre-signed upload URL via edge function
+    2. PUT blob directly to upload URL
+    3. Poll asset status until `ready` via edge function
+    4. Store `asset.playbackId` and `asset.downloadUrl` in database
+    **Note:** We record what's displayed on-screen (the AI output), not the original camera feed. This approach works for all browser/network conditions and captures the exact rendered frames.
 
 ---
 
@@ -103,11 +109,13 @@ Secrets:
 
 Routes (prefix `/functions/v1`):
 
-1. `POST /daydream/streams` → proxy → `https://api.daydream.live/v1/streams` (body: `{pipeline_id}`) → returns `{id, output_playback_id, whip_url}`.
-2. `POST /daydream/streams/:id/prompts` → proxy → `/beta/streams/:id/prompts` (send full body per current API).
-3. `POST /studio/clip` → body `{ playbackId, durationMs }` → computes `{startTime = now - durationMs, endTime = now}` → POST Livepeer **Create Clip** → returns `{assetId, playbackId, status}`; poll until `ready`.
-4. `POST /app/ticket` → create DB row + generate short code (e.g., base36 of uuid) → returns `{code, qrPngDataUrl}` (client renders QR).
-5. `POST /auth/email/start` (optional) → send OTP; or rely on Supabase Auth magic links.*All functions set strict CORS to our origin.*
+1. `POST /daydream-stream` → proxy → `https://api.daydream.live/v1/streams` (body: `{pipeline_id}`) → returns `{id, output_playback_id, whip_url}`.
+2. `POST /daydream-prompt` → proxy → `/beta/streams/:id/prompts` (send full body per current API).
+3. `POST /studio-request-upload` → calls Livepeer **Request Upload** API → returns `{uploadUrl, assetId, tus}` (pre-signed upload URL).
+4. `POST /studio-asset-status` → body `{ assetId }` → GET Livepeer asset status → returns `{status, playbackId, downloadUrl}`.
+5. `POST /save-clip` → body `{ assetId, playbackId, downloadUrl, durationMs, session_id, prompt, texture_id, texture_weight, t_index_list }` → inserts into `clips` table → returns clip record.
+6. `POST /generate-ticket` → create DB row + generate short code (e.g., base36 of uuid) → returns `{code, qrPngDataUrl}` (client renders QR).
+7. `POST /send-auth-email` → send OTP via Resend; or rely on Supabase Auth magic links.*All functions set `verify_jwt: false` for public access with CORS.*
 
 ---
 
@@ -116,11 +124,26 @@ Routes (prefix `/functions/v1`):
 - **Stack**: React + Vite. Mobile-first CSS.
 - **Identity first** (overlay after stream kicked off is OK, but begin stream asap after camera pick to parallelize login).
 - **Publish**: `getUserMedia({video:true,audio:true})` → WHIP negotiate to `whip_url`. If failed, show retry.
-- **Playback**:
-    - Option A (**preferred**): `<Player playbackId=... lowLatency="force" aspectRatio="1to1" objectFit="cover" />`.
-    - Option B: `lvpr.tv/?v={id}&lowLatency=force` in `<iframe>` sized 512×512.
-        - This option is fine if there's any hurdle using player SDK
-- **Capture UX**: press/hold button → show timer; on release call `/studio/clip` with `durationMs = clamp(startTime, endTime)`
+- **Playback**: Must use **Livepeer Player SDK v4** (`@livepeer/react/player`) with `lowLatency="force"`. Daydream playback IDs require manual src construction:
+    ```typescript
+    const src = [
+      { src: `https://livepeer.studio/webrtc/${playbackId}`, mime: 'video/h264', type: 'webrtc' },
+      { src: `https://livepeer.studio/hls/${playbackId}/index.m3u8`, mime: 'application/vnd.apple.mpegurl', type: 'hls' }
+    ];
+    ```
+    **Note:** Cannot use iframe because we need DOM access to the `<video>` element for recording.
+- **Capture UX**:
+    - **Desktop**: Click to start, click to stop (toggle mode)
+    - **Mobile**: Press and hold to record, release to stop
+    - Button only enabled when video is actively playing (listen to `playing`/`pause`/`waiting` events)
+    - Show real-time counter updating every 100ms during recording
+    - Auto-stop at 10s, cancel if released before 3s
+- **Recording**: `videoElement.captureStream()` → `MediaRecorder` with 100ms timeslice → collect chunks → create blob → upload to Livepeer Studio
+- **Camera mirroring**: Mirror the MediaStream **at the source** (before Daydream) for front camera:
+  - Original stream → Canvas with `scaleX(-1)` → `captureStream(30)` → Mirrored MediaStream
+  - Send mirrored stream to Daydream via WHIP
+  - Daydream output is naturally mirrored (no CSS transforms needed)
+  - Keeps UI elements (loading spinners, text) readable
 - **Share**: `https://twitter.com/intent/tweet?text=Made%20this%20at%20%23RealtimeAIVideo%20Summit%20by%20%40livepeer%20%40DaydreamLiveAI&url={clipPageUrl}`.
 - **Ticket**: after clip save, call `/app/ticket` → show **QR** (code text as payload). Also email ticket link if email is known.
 - **Home**: query latest `clips` with their `asset_playback_id` and show square thumbnails (use poster from Playback Info or `poster` param).
@@ -157,53 +180,14 @@ Routes (prefix `/functions/v1`):
 
 ---
 
-## Minimal Edge Function examples (TypeScript/Deno)
+## Edge Function Implementation Notes
 
-**`supabase/functions/daydream/index.ts`**
-
-```tsx
-import { serve } from "https://deno.land/std/http/server.ts";
-const BASE = "https://api.daydream.live";
-const KEY = Deno.env.get("DAYDREAM_API_KEY")!;
-serve(async (req) => {
-  const u = new URL(req.url);
-  const path = u.pathname.replace("/functions/v1/daydream", "");
-  if (!KEY) return new Response("Missing DAYDREAM_API_KEY", { status: 500 });
-  if (req.method === "OPTIONS")
-    return new Response(null, { headers: cors(u.origin) });
-  const r = await fetch(`${BASE}${path}`, {
-    method: req.method, headers: { "authorization": `Bearer ${KEY}`, "content-type": "application/json" },
-    body: ["GET","HEAD"].includes(req.method) ? undefined : await req.text(),
-  });
-  return new Response(await r.text(), { status: r.status, headers: { ...cors(u.origin), "content-type": "application/json" }});
-});
-const cors = (o:string)=>({
-  "access-control-allow-origin": o,
-  "access-control-allow-headers": "content-type, authorization",
-  "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
-});
-
-```
-
-**`supabase/functions/studio-clip/index.ts`**
-
-```tsx
-import { serve } from "https://deno.land/std/http/server.ts";
-const L = "https://livepeer.studio/api";
-const KEY = Deno.env.get("LIVEPEER_STUDIO_API_KEY")!;
-serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors("*") });
-  const { playbackId, durationMs } = await req.json();
-  const now = Date.now();
-  const body = { playbackId, startTime: now - Math.max(3000, Math.min(durationMs, 10000)), endTime: now, name: "Daydream Summit Clip" };
-  const r = await fetch(`${L}/stream/clip`, { method:"POST", headers:{ "content-type":"application/json", "authorization":`Bearer ${KEY}` }, body: JSON.stringify(body) });
-  return new Response(await r.text(), { status: r.status, headers: { ...cors("*"), "content-type":"application/json" }});
-});
-const cors=(o:string)=>({"access-control-allow-origin":o,"access-control-allow-headers":"content-type, authorization","access-control-allow-methods":"POST,OPTIONS"});
-
-```
-
-(Livepeer clip API and guides referenced.)
+All edge functions implemented in `supabase/functions/`. Key patterns:
+- CORS headers for all functions
+- `verify_jwt: false` in config for public access
+- Bearer token auth for external APIs
+- Error handling with descriptive messages
+- See actual implementations in codebase for complete examples
 
 ---
 
