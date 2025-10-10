@@ -614,7 +614,7 @@ export default function Capture() {
     if (playbackId && !isPlaying) {
       const timer = setTimeout(() => {
         setShowSlowLoadingMessage(true);
-      }, 10000);
+      }, 15000);
 
       return () => {
         clearTimeout(timer);
