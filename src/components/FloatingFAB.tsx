@@ -28,7 +28,7 @@ export function FloatingFAB({ isAuthenticated }: FloatingFABProps) {
 
     window.addEventListener('scroll', handleScroll);
     window.addEventListener('resize', handleResize);
-    
+
     return () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', handleResize);
@@ -59,7 +59,7 @@ export function FloatingFAB({ isAuthenticated }: FloatingFABProps) {
        >
          <Link to={isAuthenticated ? "/capture" : "/login"}>
            <Video className="h-4 w-4" />
-           Record Clip
+           Clip for Coffee
          </Link>
        </Button>
      </motion.div>

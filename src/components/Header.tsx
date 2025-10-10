@@ -48,7 +48,7 @@ export function Header({ isAuthenticated = false }: HeaderProps) {
           >
             <Link to={isAuthenticated ? "/capture" : "/login"}>
               <Video className="h-4 w-4" />
-              {isRecording ? "Recording..." : "Record Clip"}
+              {isRecording ? "Recording..." : "Clip for Coffee"}
             </Link>
           </Button>
         </div>
