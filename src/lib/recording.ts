@@ -32,7 +32,7 @@ export class VideoRecorder {
    */
   async start(): Promise<void> {
     // Capture stream from video element
-    const stream = this.videoElement.captureStream?.();
+    const stream = (this.videoElement as any).captureStream?.();
 
     if (!stream) {
       throw new Error('captureStream is not supported on this video element');
@@ -95,7 +95,7 @@ export class VideoRecorder {
    * Check if captureStream is supported
    */
   static isSupported(videoElement: HTMLVideoElement): boolean {
-    return typeof videoElement.captureStream === 'function';
+    return typeof (videoElement as any).captureStream === 'function';
   }
 }
 
