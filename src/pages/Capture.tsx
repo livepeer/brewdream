@@ -21,13 +21,36 @@ import { VideoRecorder, uploadToLivepeer, saveClipToDatabase } from '@/lib/recor
 const FRONT_PROMPTS = [
   "studio ghibli portrait, soft rim light",
   "cyberpunk neon portrait 90s anime",
-  "watercolor ink portrait, loose brush"
+  "watercolor ink portrait, loose brush",
+  "melting holographic portrait, liquid chrome",
+  "psychedelic kaleidoscope face, fractal patterns",
+  "glitch art portrait, RGB split, datamosh",
+  "cosmic deity portrait, galaxy skin, star eyes",
+  "retro VHS portrait, scan lines, 80s aesthetic",
+  "paper cutout collage portrait, layered colors",
+  "stained glass portrait, vivid shards",
+  "oil painting portrait, thick impasto brushstrokes",
+  "pixel art portrait, 8-bit retro gaming",
+  "neon wireframe portrait, tron grid",
+  "ukiyo-e woodblock print portrait, bold lines"
 ];
 
 const BACK_PROMPTS = [
   "vaporwave cityscape",
   "film noir scene, grainy",
-  "isometric tech poster, bold shapes"
+  "isometric tech poster, bold shapes",
+  "surreal dreamscape, melting clocks, floating objects",
+  "synthwave sunset, retrowave grid, palm trees",
+  "abstract expressionism, bold paint splatters",
+  "underwater coral reef, bioluminescent creatures",
+  "cyberpunk rain-soaked alley, neon signs",
+  "mandala pattern landscape, sacred geometry",
+  "vintage comic book scene, ben-day dots, pop art",
+  "low poly geometric world, faceted 3D",
+  "infrared photography, false color landscape",
+  "street art graffiti wall, bold tags, spray paint",
+  "M.C. Escher impossible architecture, tessellations",
+  "aurora borealis sky, swirling northern lights"
 ];
 
 const TEXTURES = [

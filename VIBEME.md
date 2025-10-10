@@ -247,9 +247,16 @@ All functions have `verify_jwt: false` (public access)
 ## 🎮 User Interactions
 
 ### Camera Selection (Capture.tsx)
-- **Front camera**: Selfie mode, portrait prompts (Ghibli, anime, watercolor)
-- **Back camera**: Environment mode, scene prompts (vaporwave, noir, isometric)
-- Randomly assigns prompt based on camera type
+- **Front camera**: Selfie mode, 14 portrait prompts including:
+  - Classic styles (Ghibli, anime, watercolor, oil painting, ukiyo-e)
+  - Digital effects (holographic, glitch art, VHS, neon wireframe, pixel art)
+  - Psychedelic/trippy (kaleidoscope, cosmic deity, stained glass)
+- **Back camera**: Environment mode, 15 scene prompts including:
+  - Retro aesthetics (vaporwave, synthwave, vintage comic, film noir)
+  - Surreal/artistic (dreamscape, abstract expressionism, M.C. Escher)
+  - Nature/tech fusion (underwater bioluminescent, cyberpunk, aurora borealis)
+  - Geometry (isometric, low poly, mandala, sacred geometry)
+- Randomly assigns prompt based on camera type on stream start
 
 ### Recording Mechanics
 - **Desktop**: Click to start, click to stop (toggle mode)
@@ -792,6 +799,7 @@ Avoid:
 - Fixed ICE gathering delay (40s → 2s) with STUN redundancy + timeout
 - Fixed missing edge function configs causing 404 errors
 - Fixed React hook dependency issues in auto-start flow
+- Expanded default prompts: 14 front camera (portraits) + 15 back camera (scenes) with trippy/artistic styles
 **Project Status**: Active development for Livepeer × Daydream Summit (Brewdream)
 **Maintainer Note**: Keep this file concise but comprehensive. Every section should answer "what do I need to know to work on this?" Always check PRD for feature requirements before implementing.
 
