@@ -104,6 +104,7 @@ export default function Capture() {
   const [captureSupported, setCaptureSupported] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showSlowLoadingMessage, setShowSlowLoadingMessage] = useState(false);
+  const [uploadingClip, setUploadingClip] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const sourceVideoRef = useRef<HTMLVideoElement>(null);
@@ -456,7 +457,7 @@ export default function Capture() {
 
     setRecording(false);
     recordStartTimeRef.current = null;
-    setLoading(true);
+    setUploadingClip(true);
 
     try {
       // Stop the recorder and get the blob
@@ -514,7 +515,7 @@ export default function Capture() {
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setUploadingClip(false);
     }
   };
 
@@ -784,13 +785,18 @@ export default function Capture() {
           onPointerDown={isMobile ? startRecording : undefined}
           onPointerUp={isMobile ? stopRecording : undefined}
           onPointerLeave={isMobile ? stopRecording : undefined}
-          disabled={loading || !playbackId || !captureSupported || !isPlaying}
+          disabled={loading || uploadingClip || !playbackId || !captureSupported || !isPlaying}
           className="w-full h-16 bg-gradient-to-r from-neutral-200 to-neutral-500 text-neutral-900 font-semibold rounded-2xl hover:from-neutral-300 hover:to-neutral-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {recording ? (
             <span className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
               Recording... ({(recordingTime / 1000).toFixed(1)}s)
+            </span>
+          ) : uploadingClip ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Uploading clip...
             </span>
           ) : loading || !isPlaying ? (
             <span className="flex items-center gap-2">
