@@ -103,6 +103,7 @@ export default function Capture() {
   const [recordingTime, setRecordingTime] = useState(0);
   const [captureSupported, setCaptureSupported] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showSlowLoadingMessage, setShowSlowLoadingMessage] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const sourceVideoRef = useRef<HTMLVideoElement>(null);
@@ -607,6 +608,22 @@ export default function Capture() {
     };
   }, []);
 
+  // Show reassuring message if stream takes longer than 10s to load
+  useEffect(() => {
+    if (playbackId && !isPlaying) {
+      const timer = setTimeout(() => {
+        setShowSlowLoadingMessage(true);
+      }, 10000);
+
+      return () => {
+        clearTimeout(timer);
+        setShowSlowLoadingMessage(false);
+      };
+    } else {
+      setShowSlowLoadingMessage(false);
+    }
+  }, [playbackId, isPlaying]);
+
   if (!cameraType) {
     // Show loading state while auto-starting on desktop
     if (loading) {
@@ -720,17 +737,27 @@ export default function Capture() {
                     }}
                   />
                   <Player.LoadingIndicator>
-                    <div className="absolute inset-0 flex items-center justify-center bg-neutral-950/50">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-950/50 gap-4">
                       <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                      <p className="text-sm text-neutral-300 text-center px-4 min-h-[20px]">
+                        {showSlowLoadingMessage && "Hang tight! Stream loading can take up to 30 seconds..."}
+                      </p>
                     </div>
                   </Player.LoadingIndicator>
                 </Player.Container>
               </Player.Root>
             </div>
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
+            <div className="w-full h-full flex flex-col items-center justify-center gap-4">
               <Loader2 className="w-12 h-12 animate-spin text-neutral-400" />
-              {playbackId && !src && <p className="text-xs text-neutral-500 mt-2">Loading stream...</p>}
+              {playbackId && !src && (
+                <>
+                  <p className="text-xs text-neutral-500">Loading stream...</p>
+                  <p className="text-sm text-neutral-300 text-center px-4 min-h-[20px]">
+                    {showSlowLoadingMessage && "Hang tight! Stream loading can take up to 30 seconds..."}
+                  </p>
+                </>
+              )}
             </div>
           )}
 
