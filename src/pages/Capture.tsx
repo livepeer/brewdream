@@ -100,7 +100,6 @@ export default function Capture() {
   const [quality, setQuality] = useState([0.4]);
 
   const [recording, setRecording] = useState(false);
-  const [recordStartTime, setRecordStartTime] = useState<number | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [captureSupported, setCaptureSupported] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -111,6 +110,7 @@ export default function Capture() {
   const recorderRef = useRef<VideoRecorder | null>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordStartTimeRef = useRef<number | null>(null);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -392,15 +392,15 @@ export default function Capture() {
       await recorder.start();
 
       recorderRef.current = recorder;
+      recordStartTimeRef.current = Date.now();
       setRecording(true);
-      setRecordStartTime(Date.now());
 
       // Auto-stop at 10 seconds
       autoStopTimerRef.current = setTimeout(() => {
-        stopRecording();
+        stopRecording().catch(err => {
+          console.error('Error in auto-stop:', err);
+        });
       }, 10000);
-
-      console.log('Recording started');
     } catch (error) {
       console.error('Error starting recording:', error);
       toast({
@@ -420,7 +420,9 @@ export default function Capture() {
   };
 
   const stopRecording = async () => {
-    if (!recorderRef.current || !recordStartTime || !streamId) return;
+    if (!recorderRef.current || !recordStartTimeRef.current || !streamId) {
+      return;
+    }
 
     // Clear auto-stop timer
     if (autoStopTimerRef.current) {
@@ -428,11 +430,12 @@ export default function Capture() {
       autoStopTimerRef.current = null;
     }
 
-    const recordingDuration = Date.now() - recordStartTime;
+    const recordingDuration = Date.now() - recordStartTimeRef.current;
 
     // Check minimum duration (3 seconds)
     if (recordingDuration < 3000) {
       setRecording(false);
+      recordStartTimeRef.current = null;
 
       // Stop and discard the recording
       try {
@@ -451,6 +454,7 @@ export default function Capture() {
     }
 
     setRecording(false);
+    recordStartTimeRef.current = null;
     setLoading(true);
 
     try {
@@ -555,16 +559,16 @@ export default function Capture() {
 
   // Update recording timer display
   useEffect(() => {
-    if (recording && recordStartTime) {
+    if (recording && recordStartTimeRef.current) {
       const interval = setInterval(() => {
-        setRecordingTime(Date.now() - recordStartTime);
+        setRecordingTime(Date.now() - recordStartTimeRef.current!);
       }, 100); // Update every 100ms for smooth counter
 
       return () => clearInterval(interval);
     } else {
       setRecordingTime(0);
     }
-  }, [recording, recordStartTime]);
+  }, [recording]);
 
   // Listen for video playback to enable recording
   useEffect(() => {
@@ -592,6 +596,16 @@ export default function Capture() {
       }
     }
   }, [playbackId, src]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoStopTimerRef.current) {
+        clearTimeout(autoStopTimerRef.current);
+        autoStopTimerRef.current = null;
+      }
+    };
+  }, []);
 
   if (!cameraType) {
     // Show loading state while auto-starting on desktop
