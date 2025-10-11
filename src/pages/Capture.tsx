@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { ArrowLeft, Camera, ImageOff, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Camera, ImageOff, Loader2, Sparkles, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -32,7 +32,27 @@ const FRONT_PROMPTS = [
   "oil painting portrait, thick impasto brushstrokes",
   "pixel art portrait, 8-bit retro gaming",
   "neon wireframe portrait, tron grid",
-  "ukiyo-e woodblock print portrait, bold lines"
+  "ukiyo-e woodblock print portrait, bold lines",
+  "art nouveau portrait, flowing organic lines, ornate border",
+  "charcoal sketch portrait, dramatic shadows, textured paper",
+  "pop art portrait, bold colors, ben-day dots, warhol style",
+  "renaissance oil painting portrait, chiaroscuro lighting",
+  "surrealist portrait, melting features, dali inspired",
+  "impressionist portrait, visible brushstrokes, monet style",
+  "geometric cubist portrait, fragmented planes, picasso style",
+  "art deco portrait, golden ratios, elegant symmetry",
+  "abstract expressionist portrait, bold gestural marks",
+  "gothic portrait, dark romanticism, dramatic lighting",
+  "minimalist line art portrait, continuous line drawing",
+  "baroque portrait, ornate details, dramatic composition",
+  "futuristic android portrait, chrome finish, LED accents",
+  "vintage tin type portrait, sepia tones, daguerreotype",
+  "fantasy crystal portrait, gemstone skin, ethereal glow",
+  "steampunk portrait, brass gears, victorian aesthetic",
+  "tribal mask portrait, bold patterns, ceremonial paint",
+  "graffiti street art portrait, spray paint drips, urban",
+  "cel-shaded anime portrait, bold outlines, flat colors",
+  "ethereal ghost portrait, translucent, wispy trails"
 ];
 
 const BACK_PROMPTS = [
@@ -50,7 +70,27 @@ const BACK_PROMPTS = [
   "infrared photography, false color landscape",
   "street art graffiti wall, bold tags, spray paint",
   "M.C. Escher impossible architecture, tessellations",
-  "aurora borealis sky, swirling northern lights"
+  "aurora borealis sky, swirling northern lights",
+  "ancient temple ruins, overgrown jungle, mystical atmosphere",
+  "nebula space scene, swirling cosmic dust, stars",
+  "dystopian wasteland, post-apocalyptic, rusted metal",
+  "enchanted forest, glowing mushrooms, fairy lights",
+  "steampunk clockwork city, brass mechanisms, steam",
+  "crystal cave, glowing minerals, underground wonder",
+  "floating islands, waterfalls into clouds, fantasy realm",
+  "neon tokyo street, rain reflections, busy night",
+  "desert mirage, heat waves, surreal oasis",
+  "arctic ice palace, frozen architecture, blue tones",
+  "volcanic landscape, lava flows, dramatic fire glow",
+  "alien planet surface, strange flora, dual suns",
+  "medieval castle, fog, dramatic moonlight",
+  "carnival carousel, vintage lights, whimsical",
+  "zen garden, raked sand patterns, minimalist peace",
+  "art gallery, abstract paintings, modern interior",
+  "futuristic laboratory, holographic displays, sci-fi tech",
+  "enchanted library, floating books, magical atmosphere",
+  "cherry blossom garden, pink petals falling, serene",
+  "gothic cathedral interior, stained glass, divine rays"
 ];
 
 const TEXTURES = [
@@ -846,12 +886,28 @@ export default function Capture() {
         <div className="bg-neutral-950 rounded-3xl p-6 border border-neutral-800 space-y-4 shadow-inner">
           <div>
             <label className="text-sm font-medium mb-2 block text-neutral-300">Prompt</label>
-            <Input
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe your AI effect..."
-              className="bg-neutral-950 border-neutral-800 focus:border-neutral-600 focus:ring-0 text-neutral-100 placeholder:text-neutral-500"
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Describe your AI effect..."
+                className="bg-neutral-950 border-neutral-800 focus:border-neutral-600 focus:ring-0 text-neutral-100 placeholder:text-neutral-500"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  const prompts = cameraType === 'front' ? FRONT_PROMPTS : BACK_PROMPTS;
+                  const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+                  setPrompt(randomPrompt);
+                }}
+                className="bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 shrink-0"
+                title="Random prompt"
+              >
+                <RefreshCw className="h-4 w-4 text-neutral-300" />
+              </Button>
+            </div>
           </div>
 
           <div>
