@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { ArrowLeft, Camera, ImageOff, Loader2, Sparkles, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Camera, ImageOff, Loader2, Sparkles, RefreshCw, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -169,6 +169,9 @@ export default function Capture() {
   const [showSlowLoadingMessage, setShowSlowLoadingMessage] = useState(false);
   const [uploadingClip, setUploadingClip] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
+  const [micEnabled, setMicEnabled] = useState(false);
+  const [micPermissionGranted, setMicPermissionGranted] = useState(false);
+  const [micPermissionDenied, setMicPermissionDenied] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const sourceVideoRef = useRef<HTMLVideoElement>(null);
@@ -177,6 +180,9 @@ export default function Capture() {
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recordStartTimeRef = useRef<number | null>(null);
+  const originalStreamRef = useRef<MediaStream | null>(null);
+  const silentAudioTrackRef = useRef<MediaStreamTrack | null>(null);
+  const realAudioTrackRef = useRef<MediaStreamTrack | null>(null);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -264,6 +270,25 @@ export default function Capture() {
   }, [autoStartChecked, cameraType, loading]);
 
   /**
+   * Create a silent audio track for streaming when microphone is disabled
+   */
+  const createSilentAudioTrack = (): MediaStreamTrack => {
+    const audioContext = new AudioContext();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    // Set volume to 0 (silent)
+    gainNode.gain.value = 0;
+    
+    oscillator.connect(gainNode);
+    const destination = audioContext.createMediaStreamDestination();
+    gainNode.connect(destination);
+    oscillator.start();
+    
+    return destination.stream.getAudioTracks()[0];
+  };
+
+  /**
    * Mirror a video stream by rendering it through a canvas
    * This ensures the mirrored stream goes to Daydream, so the output is naturally mirrored
    */
@@ -303,40 +328,141 @@ export default function Capture() {
     // Capture the mirrored stream from canvas (24 fps to match typical camera)
     const mirroredVideoStream = canvas.captureStream(24);
 
-    // Add the original audio tracks to the mirrored stream
-    originalStream.getAudioTracks().forEach(track => {
-      mirroredVideoStream.addTrack(track);
-    });
+    // Note: Audio tracks are handled separately in startWebRTCPublish
+    // We don't add them here to maintain control over mic on/off state
 
     return mirroredVideoStream;
   };
 
   const startWebRTCPublish = async (whipUrl: string, type: 'front' | 'back') => {
     try {
-      const originalStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: type === 'front' ? 'user' : 'environment',
-          width: 512,
-          height: 512,
-        },
-        audio: true,
-      });
+      // Request both camera and microphone permissions upfront
+      let originalStream: MediaStream;
+      let hasAudioPermission = false;
+      
+      try {
+        originalStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: type === 'front' ? 'user' : 'environment',
+            width: 512,
+            height: 512,
+          },
+          audio: true,
+        });
+        hasAudioPermission = true;
+        setMicPermissionGranted(true);
+        setMicPermissionDenied(false);
+      } catch (audioError) {
+        console.warn('Microphone permission denied or unavailable:', audioError);
+        // Try again with video only
+        originalStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: type === 'front' ? 'user' : 'environment',
+            width: 512,
+            height: 512,
+          },
+        });
+        setMicPermissionDenied(true);
+        setMicPermissionGranted(false);
+      }
+
+      // Store the original stream
+      originalStreamRef.current = originalStream;
 
       // Mirror the stream if using front camera
-      const stream = type === 'front' ? mirrorStream(originalStream) : originalStream;
+      const videoStream = type === 'front' ? mirrorStream(originalStream) : originalStream;
+
+      // Handle audio track setup
+      const audioTracks = originalStream.getAudioTracks();
+      if (audioTracks.length > 0 && hasAudioPermission) {
+        // We have mic permission - use the real audio track but start disabled
+        realAudioTrackRef.current = audioTracks[0];
+        realAudioTrackRef.current.enabled = false; // Mic off by default
+        
+        // Make sure the audio track is in the video stream
+        if (!videoStream.getAudioTracks().find(t => t.id === realAudioTrackRef.current!.id)) {
+          videoStream.addTrack(realAudioTrackRef.current);
+        }
+      } else {
+        // No mic permission - use silent audio track
+        const silentTrack = createSilentAudioTrack();
+        silentAudioTrackRef.current = silentTrack;
+        
+        // Remove any existing audio tracks and add silent one
+        videoStream.getAudioTracks().forEach(track => {
+          videoStream.removeTrack(track);
+        });
+        videoStream.addTrack(silentTrack);
+      }
 
       if (sourceVideoRef.current) {
-        sourceVideoRef.current.srcObject = stream;
+        sourceVideoRef.current.srcObject = videoStream;
       }
 
       // Use the WHIP helper from daydream.ts
-      const pc = await startWhipPublish(whipUrl, stream);
+      const pc = await startWhipPublish(whipUrl, videoStream);
       pcRef.current = pc;
 
-      console.log('WebRTC publishing started');
+      console.log('WebRTC publishing started with silent audio');
     } catch (error) {
       console.error('Error starting WebRTC publish:', error);
       throw error;
+    }
+  };
+
+  const toggleMicrophone = async () => {
+    // If permission was denied or never granted, try to request it
+    if (micPermissionDenied || !realAudioTrackRef.current) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioTrack = stream.getAudioTracks()[0];
+        
+        if (audioTrack && pcRef.current) {
+          // Replace the silent track with the real one (only time we replace)
+          const senders = pcRef.current.getSenders();
+          const audioSender = senders.find(sender => sender.track?.kind === 'audio');
+          
+          if (audioSender && silentAudioTrackRef.current) {
+            await audioSender.replaceTrack(audioTrack);
+            realAudioTrackRef.current = audioTrack;
+            realAudioTrackRef.current.enabled = true;
+            
+            // Stop the old silent track
+            silentAudioTrackRef.current.stop();
+            silentAudioTrackRef.current = null;
+            
+            setMicPermissionGranted(true);
+            setMicPermissionDenied(false);
+            setMicEnabled(true);
+            
+            toast({
+              title: 'Microphone enabled',
+              description: 'Now streaming live audio',
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error requesting microphone permission:', error);
+        setMicPermissionDenied(true);
+        toast({
+          title: 'Microphone access denied',
+          description: 'Please allow microphone access in your browser settings',
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
+    // We have the real audio track - just toggle the enabled property
+    if (realAudioTrackRef.current) {
+      const newEnabledState = !micEnabled;
+      realAudioTrackRef.current.enabled = newEnabledState;
+      setMicEnabled(newEnabledState);
+      
+      toast({
+        title: newEnabledState ? 'Microphone enabled' : 'Microphone disabled',
+        description: newEnabledState ? 'Now streaming live audio' : 'Microphone muted',
+      });
     }
   };
 
@@ -680,6 +806,24 @@ export default function Capture() {
     };
   }, []);
 
+  // Cleanup audio tracks on unmount
+  useEffect(() => {
+    return () => {
+      if (realAudioTrackRef.current) {
+        realAudioTrackRef.current.stop();
+        realAudioTrackRef.current = null;
+      }
+      if (silentAudioTrackRef.current) {
+        silentAudioTrackRef.current.stop();
+        silentAudioTrackRef.current = null;
+      }
+      if (originalStreamRef.current) {
+        originalStreamRef.current.getTracks().forEach(track => track.stop());
+        originalStreamRef.current = null;
+      }
+    };
+  }, []);
+
   // Show reassuring message if stream takes longer than 10s to load
   useEffect(() => {
     if (playbackId && !isPlaying) {
@@ -832,6 +976,30 @@ export default function Capture() {
               )}
             </div>
           )}
+
+          {/* Microphone Toggle Button */}
+          <div className="absolute bottom-4 left-4">
+            <Button
+              onClick={toggleMicrophone}
+              disabled={loading || !playbackId}
+              size="icon"
+              variant={micEnabled ? "default" : "secondary"}
+              className={`w-14 h-14 rounded-full shadow-lg transition-all duration-200 ${
+                micEnabled 
+                  ? 'bg-green-600 hover:bg-green-700 text-white' 
+                  : micPermissionDenied 
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200'
+              }`}
+              title={micEnabled ? 'Disable microphone' : micPermissionDenied ? 'Microphone access denied' : 'Enable microphone'}
+            >
+              {micEnabled ? (
+                <Mic className="w-6 h-6" />
+              ) : (
+                <MicOff className="w-6 h-6" />
+              )}
+            </Button>
+          </div>
 
           {/* PiP Source Preview */}
           <div className="absolute bottom-4 right-4 w-24 h-24 rounded-2xl overflow-hidden border-2 border-white shadow-lg">
