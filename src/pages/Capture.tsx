@@ -843,7 +843,8 @@ export default function Capture() {
       }, 500);
       return () => clearTimeout(debounce);
     }
-  }, [prompt, selectedTexture, textureWeight, creativity, quality, streamId, updatePrompt]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prompt, selectedTexture, textureWeight, creativity, quality, streamId]);
 
   // Update recording timer display
   useEffect(() => {
