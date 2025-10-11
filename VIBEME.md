@@ -131,9 +131,9 @@ These are **non-negotiable** technical requirements:
 4. **AI Effect Controls** (Capture.tsx):
    - **Prompt**: Text description of style
    - **Texture**: Optional image overlay (8 presets)
-   - **Creativity** (1-10): Controls denoise strength via `t_index_list`
-   - **Quality** (0-1): Number of diffusion steps (0.25=1 step, 1.0=4 steps)
-   - **t_index_list**: `[6, 12, 18, 24]` scaled by creativity (formula: `2.62 - 0.132 * creativity`)
+   - **Intensity** (1-10): Controls stylization strength via `t_index_list` (1=low/refined, 10=high/stylized)
+   - **Quality** (0-1): Two-stage control - (1) number of steps at thresholds, (2) continuous value interpolation within ranges
+   - **t_index_list**: Two-stage interpolation - intensity sets base values, quality shifts them toward higher indices
 
 5. **Clip Recording** (recording.ts + Capture.tsx):
    - **Button behavior**: Desktop (click toggle), Mobile (press & hold)
@@ -153,7 +153,7 @@ These are **non-negotiable** technical requirements:
 7. **Database Save** (recording.ts):
    - Look up session ID from stream
    - Save clip metadata via `save-clip` edge function
-   - Includes prompt, texture, creativity/quality params, duration
+   - Includes prompt, texture, intensity/quality params, duration
    - Navigate to clip page
 
 8. **Share & Reward** (ClipView.tsx):
@@ -221,10 +221,11 @@ These are **non-negotiable** technical requirements:
 ### Daydream API
 - **Base URL**: `https://api.daydream.live`
 - **Endpoints**:
-  - `POST /v1/streams` - Create stream
-  - `POST /beta/streams/:id/prompts` - Update prompt
+  - `POST /v1/streams` - Create stream (body: `{pipeline_id}`)
+  - `PATCH /v1/streams/:id` - Update stream params (body: `{params: {...}}`)
 - **Auth**: Bearer token (`DAYDREAM_API_KEY`)
-- **Key fields**: `pipeline_id`, `prompt`, `texture_weight`, `t_index_list`
+- **Key fields**: `pipeline_id`, `prompt`, `t_index_list`, `controlnets`, `model_id`
+- **Hot-swappable params**: `prompt`, `num_inference_steps`, `t_index_list`, `seed`, `controlnets[*].conditioning_scale`
 
 ### Livepeer Studio API
 - **Base URL**: `https://livepeer.studio/api`
@@ -282,7 +283,7 @@ All functions have `verify_jwt: false` (public access)
 - **Debounced updates**: 500ms delay on input change
 - **Auto-apply**: Changes trigger immediate stream update
 - **Texture overlay**: Optional, 8 presets, weight slider (0-1)
-- **Creativity/Quality**: Abstract sliders that map to diffusion parameters
+- **Intensity/Quality**: Abstract sliders that map to diffusion parameters (Intensity is coffee-themed)
 
 ### Ticket Redemption (ClipView.tsx)
 - **Interactive validation**: Bartender swipes down on user's phone to redeem
@@ -412,25 +413,56 @@ const clip = await saveClipToDatabase({ assetId, playbackId, ... });
 
 ## 🎯 Key Business Logic
 
-### T-Index Calculation (Creativity/Quality)
-**Matches PRD § "Controls → parameter mapping"**
+### T-Index Calculation (Intensity/Quality)
+**Two-stage interpolation: Intensity → Quality**
 
 ```typescript
-// Quality [0..1] determines number of diffusion steps (defaults to 0.4)
-quality < 0.25 → [6]              (1 step, fastest)
-quality < 0.50 → [6, 12]          (2 steps)
-quality < 0.75 → [6, 12, 18]      (3 steps)
-quality ≥ 0.75 → [6, 12, 18, 24]  (4 steps, best quality)
+// STAGE 1: Intensity interpolation (base values at quality range boundaries)
+// Intensity [1..10] determines stylization level (defaults to 5)
+low_intensity_target = [30, 35, 40, 45]   // intensity=1 (low/refined)
+high_intensity_target = [6, 12, 18, 24]   // intensity=10 (high/stylized)
+base[i] = high[i] + (low[i] - high[i]) * (10 - intensity) / 9
 
-// Creativity [1..10] scales the indices (defaults to 5)
-// Higher creativity → lower indices → more stylization
-scale = 2.62 - 0.132 * creativity
-t_index = base_index * scale (clamped 0-50, rounded)
+// STAGE 2: Quality interpolation (step count + value shifting)
+// Quality [0..1] has dual role (defaults to 0.4):
 
-// Rationale (from PRD):
-// - Higher/later indices bias refinement
-// - Earlier indices increase stylization
-// - Fallback: [4, 12, 20] if any value invalid
+// (A) Step count at thresholds:
+quality < 0.25 → 1 step   (first value only)
+quality < 0.50 → 2 steps  (first two values)
+quality < 0.75 → 3 steps  (first three values)
+quality ≥ 0.75 → 4 steps  (all four values)
+
+// (B) Continuous interpolation within each range:
+// - Calculate progress within range: qualityProgress = (quality - rangeStart) / 0.25
+// - Each value interpolates toward the next:
+//     • Indices 0-2: interpolate toward next index value
+//     • Last index: extrapolate using same spacing as previous step
+// - Formula: result[i] = base[i] + (nextValue[i] - base[i]) * qualityProgress
+
+// SIMPLE EXPLANATION:
+// Quality does TWO things:
+//   1. Adds more steps when crossing thresholds (0.25, 0.50, 0.75)
+//   2. Smoothly shifts all values upward within each range (more refinement)
+
+// Examples (showing quality's dual effect):
+Intensity 10, Quality 0.25: [6, 12]          // 2 steps, base values
+Intensity 10, Quality 0.375: [9, 15]         // 2 steps, values shifted up
+Intensity 10, Quality 0.50: [6, 12, 18]      // 3 steps, base values
+Intensity 10, Quality 0.75: [6, 12, 18, 24]  // 4 steps, base values
+Intensity 10, Quality 1.0: [12, 18, 24, 30]  // 4 steps, all shifted up (max refinement)
+
+Intensity 1, Quality 0.75: [30, 35, 40, 45]  // 4 steps, low intensity base
+Intensity 1, Quality 1.0: [35, 40, 45, 50]   // 4 steps, shifted to maximum refinement
+
+Intensity 5, Quality 0.75: [19, 25, 30, 36]  // 4 steps, balanced
+Intensity 5, Quality 1.0: [25, 30, 36, 41]   // 4 steps, shifted upward
+
+// Rationale:
+// - Higher t_index values (later diffusion timesteps) = more refinement/realism
+// - Lower t_index values (earlier timesteps) = more AI stylization/effects
+// - Two-stage approach: intensity sets character, quality adds both steps and refinement
+// - Smooth continuous control over entire intensity×quality parameter space
+// - At quality=1.0, maximum refinement regardless of intensity level
 ```
 
 ### Clip Duration Enforcement
@@ -548,6 +580,35 @@ navigate('/path');
 
 ## 🐛 Known Issues & Workarounds
 
+### Stream Not Ready on Initialization (✅ RESOLVED)
+**Issue**: When creating a Daydream stream, attempting to update parameters immediately would fail with "Stream not ready yet" error. This blocked camera initialization and left users with a black screen.
+
+**Root Cause**: 
+- Daydream API's POST `/v1/streams` only accepts `pipeline_id` parameter
+- Initial parameters (prompt, t_index_list, etc.) must be sent via separate PATCH request
+- Stream needs time to initialize before accepting parameter updates
+
+**Solution** (`supabase/functions/daydream-stream/index.ts`):
+Edge function now handles both stream creation AND parameter initialization:
+1. **Single client call**: Client passes `initialParams` to edge function
+2. **Server-side retry**: Edge function handles 10 retries with 1-second intervals for "not ready" errors
+3. **Non-blocking**: Edge function returns immediately, params update in background
+4. **Graceful degradation**: If param update fails, stream continues with defaults
+
+```typescript
+// Client: One simple call
+const stream = await createDaydreamStream(initialParams);
+
+// Edge function: Handles create + param init with retry
+POST /v1/streams → PATCH /v1/streams/:id (with retry)
+```
+
+**Impact**: 
+- Camera shows video feed immediately (~2-3 seconds)
+- Stream parameters applied within 1-2 seconds (background)
+- No more "Stream not ready yet" errors visible to user
+- Cleaner architecture: retry logic centralized in edge function
+
 ### Camera Mirroring (✅ RESOLVED)
 **Solution**: Mirror the MediaStream **at the source** before sending to Daydream:
 - Original camera stream → Canvas with `scaleX(-1)` → `captureStream(30)` → Mirrored MediaStream
@@ -630,17 +691,19 @@ verify_jwt = false
 - If `model_id` omitted from any param update, Daydream tries to reload default model
 - `ip_adapter` must always be specified (even if disabled) per Daydream API requirements
 
-**Solutions** (`src/lib/daydream.ts` + `src/pages/Capture.tsx`):
+**Solutions** (`src/lib/daydream.ts` + `src/pages/Capture.tsx` + edge functions):
 1. Fixed pipeline_id to `'pip_SDXL-turbo'` (correct SDXL pipeline)
-2. Modified `createDaydreamStream()` to accept `initialParams` 
-3. After creating stream, immediately call `updateDaydreamPrompts()` with initial params:
+2. Fixed API endpoint: Changed from `POST /beta/streams/:id/prompts` to `PATCH /v1/streams/:id`
+3. Fixed body structure: Send `{params: {...}}` directly, not wrapped in `{model_id, pipeline, params}`
+4. Modified `createDaydreamStream()` to accept `initialParams` 
+5. After creating stream, immediately call `updateDaydreamPrompts()` with initial params:
    - `model_id`: Always set to `'stabilityai/sdxl-turbo'`
    - `prompt`: Use selected random prompt based on camera type
    - `t_index_list`: Calculate from initial creativity/quality values
    - `controlnets`: Specify all SDXL controlnets with conditioning scales
    - `ip_adapter`: Always include even when disabled (set `enabled: false`)
-4. Added critical comments to always include `model_id` in param updates
-5. Ensured `ip_adapter` always specified in updates (even if disabled)
+6. Added critical comments to always include `model_id` in param updates
+7. Ensured `ip_adapter` always specified in updates (even if disabled)
 
 **Impact**: 
 - Pipeline now runs on correct SDXL nodes
@@ -773,7 +836,7 @@ Avoid:
 - Camera selector (front/back) with permission prompts
 - Live output (1:1 square) with PiP source preview via Livepeer Player SDK v4
 - Manual src construction for Daydream playback IDs
-- Prompt, Texture+Weight, Creativity, Quality controls with debounced updates
+- Prompt, Texture+Weight, Intensity, Quality controls with debounced updates
 - Recording with `captureStream()` + `MediaRecorder` (3-10s duration enforcement)
 - Desktop (click toggle) vs Mobile (press & hold) recording mechanics
 - Real-time recording counter (100ms updates)
@@ -814,6 +877,8 @@ Avoid:
 ---
 
 **Last Updated**: 2025-10-11
+- Fixed stream initialization race condition: moved retry logic to edge function for cleaner architecture
+- Camera now starts immediately while params update in background (no more black screen or "Stream not ready yet" errors)
 - Fixed critical params updating logic bugs: stream now starts with correct prompt (via immediate post-creation prompt update) and no model reload issues
 - Canvas-based mirroring at source for natural selfie mode
 - Interactive ticket redemption with swipe-to-validate UX
