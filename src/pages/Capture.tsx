@@ -579,7 +579,33 @@ export default function Capture() {
         num_inference_steps: 50,
       };
 
-      // Include IP-Adapter only if a texture is selected
+      // CRITICAL: Always include controlnets - depth with proper conditioning scale
+      // This is required for consistent stream behavior
+      params.controlnets = [
+        {
+          enabled: true,
+          model_id: 'xinsir/controlnet-depth-sdxl-1.0',
+          preprocessor: 'depth_tensorrt',
+          preprocessor_params: {},
+          conditioning_scale: selectedTextureObj ? 0 : 0.3, // Disable depth when using texture
+        },
+        {
+          enabled: true,
+          model_id: 'xinsir/controlnet-canny-sdxl-1.0',
+          preprocessor: 'canny',
+          preprocessor_params: {},
+          conditioning_scale: 0,
+        },
+        {
+          enabled: true,
+          model_id: 'xinsir/controlnet-tile-sdxl-1.0',
+          preprocessor: 'feedback',
+          preprocessor_params: {},
+          conditioning_scale: 0,
+        },
+      ];
+
+      // Include IP-Adapter when a texture is selected, otherwise disable it
       if (selectedTextureObj) {
         params.ip_adapter = {
           enabled: true,
@@ -589,31 +615,15 @@ export default function Capture() {
           insightface_model_name: 'buffalo_l',
         };
         params.ip_adapter_style_image_url = selectedTextureObj.url;
-
-        // Use SDXL default controlnets but set conditioning_scale to 0 (disabled via scale)
-        params.controlnets = [
-          {
-            enabled: true,
-            model_id: 'xinsir/controlnet-depth-sdxl-1.0',
-            preprocessor: 'depth_tensorrt',
-            preprocessor_params: {},
-            conditioning_scale: 0,
-          },
-          {
-            enabled: true,
-            model_id: 'xinsir/controlnet-canny-sdxl-1.0',
-            preprocessor: 'canny',
-            preprocessor_params: {},
-            conditioning_scale: 0,
-          },
-          {
-            enabled: true,
-            model_id: 'xinsir/controlnet-tile-sdxl-1.0',
-            preprocessor: 'feedback',
-            preprocessor_params: {},
-            conditioning_scale: 0,
-          },
-        ];
+      } else {
+        // Explicitly disable IP-Adapter when no texture selected
+        params.ip_adapter = {
+          enabled: false,
+          type: 'regular',
+          scale: 0,
+          weight_type: 'linear',
+          insightface_model_name: 'buffalo_l',
+        };
       }
 
       // Use the StreamDiffusion prompt helper with proper params
@@ -843,16 +853,27 @@ export default function Capture() {
     if (streamId && !streamInitialized) {
       // Wait 3 seconds for the background initialization to complete before allowing updates
       const timer = setTimeout(() => {
+        console.log('Stream initialized - syncing current parameters');
         setStreamInitialized(true);
       }, 3000);
       return () => clearTimeout(timer);
     }
   }, [streamId, streamInitialized]);
 
+  // When stream becomes initialized, immediately sync current UI state to stream
+  useEffect(() => {
+    if (streamId && streamInitialized && prompt) {
+      console.log('Stream just initialized - forcing parameter sync');
+      updatePrompt();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamInitialized]); // Only trigger when streamInitialized changes
+
   useEffect(() => {
     // Only update if stream is initialized (skip the initial update when stream is first created)
     if (prompt && streamId && streamInitialized) {
       const debounce = setTimeout(() => {
+        console.log('Parameter changed - updating stream');
         updatePrompt();
       }, 500);
       return () => clearTimeout(debounce);

@@ -480,7 +480,8 @@ User types → setState → useEffect (500ms debounce) → updatePrompt()
 
 Note: Initial stream creation uses background initialization via edge function.
 Prompt updates are blocked for 3 seconds after stream creation to prevent
-conflicts with the background initialization.
+conflicts with the background initialization. After 3 seconds, a forced sync
+updates the stream with current UI state to ensure consistency.
 ```
 
 ## 🎨 UI/UX Patterns
@@ -854,6 +855,7 @@ Avoid:
 - Camera now starts immediately while params update in background (no more black screen or "Stream not ready yet" errors)
 - Fixed critical params updating logic bugs: stream now starts with correct prompt (via immediate post-creation prompt update) and no model reload issues
 - **Fixed prompt update race condition (✅ RESOLVED)**: Added 3-second initialization period to prevent prompt updates from interfering with background initialization. Stream now correctly starts with selected prompt and stays with it until user makes changes.
+- **Fixed parameter sync issue (✅ RESOLVED)**: Added forced parameter sync after 3-second initialization completes. This ensures UI state is always applied to the stream even if user hasn't changed any values. Also fixed controlnets to always be included (with proper depth conditioning scale) for consistent stream behavior.
 - Canvas-based mirroring at source for natural selfie mode
 - Interactive ticket redemption with swipe-to-validate UX
 - Fixed ICE gathering delay (40s → 2s) with STUN redundancy + timeout
