@@ -159,7 +159,7 @@ export default function Capture() {
   const [prompt, setPrompt] = useState('');
   const [selectedTexture, setSelectedTexture] = useState<string | null>(null);
   const [textureWeight, setTextureWeight] = useState([0.5]);
-  const [creativity, setCreativity] = useState([5]);
+  const [intensity, setIntensity] = useState([5]);
   const [quality, setQuality] = useState([0.4]);
 
   const [recording, setRecording] = useState(false);
@@ -558,8 +558,8 @@ export default function Capture() {
     if (!streamId) return;
 
     try {
-      // Calculate t_index_list based on creativity and quality
-      const tIndexList = calculateTIndexList(creativity[0], quality[0]);
+      // Calculate t_index_list based on intensity and quality
+      const tIndexList = calculateTIndexList(intensity[0], quality[0]);
 
       // Determine IP-Adapter settings when a texture is selected
       const selectedTextureObj = selectedTexture
@@ -620,23 +620,73 @@ export default function Capture() {
     } catch (error: unknown) {
       console.error('Error updating prompt:', error);
     }
-  }, [streamId, prompt, creativity, quality, selectedTexture, textureWeight]);
+  }, [streamId, prompt, intensity, quality, selectedTexture, textureWeight]);
 
-  const calculateTIndexList = (creativityVal: number, qualityVal: number): number[] => {
-    let baseIndices: number[];
+  const calculateTIndexList = (intensityVal: number, qualityVal: number): number[] => {
+    // Target t_index values for extreme intensities (at quality range boundaries)
+    const lowIntensityTarget = [30, 35, 40, 45];  // intensity=1 (chill/refined)
+    const highIntensityTarget = [6, 12, 18, 24];  // intensity=10 (psychedelic/stylized)
 
+    // Determine number of steps and quality interpolation progress within range
+    let numSteps: number;
+    let qualityProgress: number;
+    
     if (qualityVal < 0.25) {
-      baseIndices = [6];
+      numSteps = 1;
+      qualityProgress = qualityVal / 0.25;
     } else if (qualityVal < 0.50) {
-      baseIndices = [6, 12];
+      numSteps = 2;
+      qualityProgress = (qualityVal - 0.25) / 0.25;
     } else if (qualityVal < 0.75) {
-      baseIndices = [6, 12, 18];
+      numSteps = 3;
+      qualityProgress = (qualityVal - 0.50) / 0.25;
     } else {
-      baseIndices = [6, 12, 18, 24];
+      numSteps = 4;
+      qualityProgress = (qualityVal - 0.75) / 0.25;
+    }
+    
+    // Clamp quality progress to [0, 1]
+    qualityProgress = Math.max(0, Math.min(1, qualityProgress));
+
+    // Step 1: Intensity interpolation to get base values at start of quality range
+    const baseValues: number[] = [];
+    for (let i = 0; i < numSteps; i++) {
+      const value = highIntensityTarget[i] + 
+                    (lowIntensityTarget[i] - highIntensityTarget[i]) * 
+                    (10 - intensityVal) / 9;
+      baseValues.push(value);
     }
 
-    const scale = 2.62 - 0.132 * creativityVal;
-    return baseIndices.map(idx => Math.max(0, Math.min(50, Math.round(idx * scale))));
+    // Step 2: Quality interpolation - each value interpolates toward next
+    const result: number[] = [];
+    for (let i = 0; i < numSteps; i++) {
+      const currentVal = baseValues[i];
+      
+      // Determine target value for interpolation
+      let nextVal: number;
+      if (i < numSteps - 1) {
+        // Interpolate toward next index value
+        nextVal = baseValues[i + 1];
+      } else {
+        // Last index: extrapolate using diff from previous step
+        if (i > 0) {
+          const diff = baseValues[i] - baseValues[i - 1];
+          nextVal = baseValues[i] + diff;
+        } else {
+          // Single step: interpolate toward next intensity target value
+          const nextIntensityVal = highIntensityTarget[i + 1] + 
+                                   (lowIntensityTarget[i + 1] - highIntensityTarget[i + 1]) * 
+                                   (10 - intensityVal) / 9;
+          nextVal = nextIntensityVal;
+        }
+      }
+      
+      // Interpolate based on quality progress within range
+      const interpolated = currentVal + (nextVal - currentVal) * qualityProgress;
+      result.push(Math.max(0, Math.min(50, Math.round(interpolated))));
+    }
+
+    return result;
   };
 
   const startRecording = async () => {
@@ -783,7 +833,7 @@ export default function Capture() {
         prompt,
         textureId: selectedTexture,
         textureWeight: selectedTexture ? textureWeight[0] : null,
-        tIndexList: calculateTIndexList(creativity[0], quality[0]),
+        tIndexList: calculateTIndexList(intensity[0], quality[0]),
       });
 
       toast({
@@ -843,7 +893,7 @@ export default function Capture() {
       }, 500);
       return () => clearTimeout(debounce);
     }
-  }, [prompt, selectedTexture, textureWeight, creativity, quality, streamId, updatePrompt]);
+  }, [prompt, selectedTexture, textureWeight, intensity, quality, streamId, updatePrompt]);
 
   // Update recording timer display
   useEffect(() => {
@@ -1287,19 +1337,19 @@ export default function Capture() {
               </div>
             </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block text-neutral-300">
-                Creativity: {creativity[0].toFixed(1)}
-              </label>
-              <Slider
-                value={creativity}
-                onValueChange={setCreativity}
-                min={1}
-                max={10}
-                step={0.1}
-                className="w-full accent-neutral-400"
-              />
-            </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block text-neutral-300">
+              Intensity: {intensity[0].toFixed(1)}
+            </label>
+            <Slider
+              value={intensity}
+              onValueChange={setIntensity}
+              min={1}
+              max={10}
+              step={0.1}
+              className="w-full accent-neutral-400"
+            />
+          </div>
 
             <div>
               <label className="text-sm font-medium mb-2 block text-neutral-300">
