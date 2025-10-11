@@ -39,20 +39,28 @@ export interface StreamDiffusionParams {
 
 /**
  * Create a new Daydream stream with the StreamDiffusion pipeline
- * If initialParams provided, the edge function handles parameter initialization with retry logic
+ * If initialParams provided, immediately updates the stream with those params
  */
 export async function createDaydreamStream(initialParams?: StreamDiffusionParams): Promise<DaydreamStream> {
+  // Step 1: Create stream (only accepts pipeline_id)
   const { data, error } = await supabase.functions.invoke('daydream-stream', {
     body: { 
-      pipeline_id: 'pip_SDXL-turbo',
-      initialParams // Edge function handles param initialization
+      pipeline_id: 'pip_SDXL-turbo' // Correct SDXL pipeline ID
     }
   });
 
   if (error) throw error;
   if (!data) throw new Error('No stream data returned');
 
-  return data as DaydreamStream;
+  const stream = data as DaydreamStream;
+
+  // Step 2: Immediately update with initial params if provided
+  // This prevents the stream from starting with Daydream defaults
+  if (initialParams) {
+    await updateDaydreamPrompts(stream.id, initialParams);
+  }
+
+  return stream;
 }
 
 /**
@@ -166,8 +174,10 @@ export async function updateDaydreamPrompts(
   }));
 
   // CRITICAL: Always include model_id to prevent Daydream from loading default
-  // API expects just { params: { ... } } structure for PATCH /v1/streams/:id
+  // Also always specify ip_adapter even if disabled (API requirement)
   const body = {
+    model_id: 'streamdiffusion',
+    pipeline: 'live-video-to-video',
     params: {
       model_id: params.model_id || 'stabilityai/sdxl-turbo', // ALWAYS include
       prompt: params.prompt,

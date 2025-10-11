@@ -54,7 +54,7 @@ Creates a new Daydream stream with the StreamDiffusion pipeline.
 ```
 
 #### 2. `/functions/daydream-prompt/index.ts`
-Updates stream parameters for real-time AI effects using Daydream's PATCH endpoint.
+Updates StreamDiffusion prompts for real-time AI effects.
 
 **Endpoint**: Called via `supabase.functions.invoke('daydream-prompt', { body })`
 
@@ -62,8 +62,10 @@ Updates stream parameters for real-time AI effects using Daydream's PATCH endpoi
 ```json
 {
   "streamId": "stream_abc123",
+  "model_id": "streamdiffusion",
+  "pipeline": "live-video-to-video",
   "params": {
-    "model_id": "stabilityai/sdxl-turbo",
+    "model_id": "stabilityai/sd-turbo",
     "prompt": "cyberpunk portrait, neon lights",
     "negative_prompt": "blurry, low quality",
     "t_index_list": [6, 12, 18],
@@ -71,18 +73,16 @@ Updates stream parameters for real-time AI effects using Daydream's PATCH endpoi
     "num_inference_steps": 50,
     "controlnets": [
       {
-        "model_id": "xinsir/controlnet-canny-sdxl-1.0",
+        "model_id": "thibaud/controlnet-sd21-canny-diffusers",
         "preprocessor": "canny",
-        "preprocessor_params": {},
-        "conditioning_scale": 0.3
+        "preprocessor_params": { "high_threshold": 200, "low_threshold": 100 },
+        "conditioning_scale": 0
       }
       // ... more controlnets
     ]
   }
 }
 ```
-
-**Note**: The API expects `{params: {...}}` structure. Hot-swappable params (no reload): `prompt`, `num_inference_steps`, `t_index_list`, `seed`, `controlnets[*].conditioning_scale`.
 
 ### Client-Side
 

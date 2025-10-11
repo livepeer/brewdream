@@ -23,7 +23,7 @@ Mobile-first microsite for the **Realtime AI Video Summit (Open Source AI Week)*
     - **Controls (v1 minimal):**
         - **Prompt** (placeholder shows default chosen randomly for front/back based on a list you create for this context; user can overwrite).
         - **Texture** (IP-Adapter single-select, 8 options + “No texture” which is default), **Weight** slider when enabled [0..1]. Clean UI ideally same line
-        - **Intensity** [1..10] and **Quality** [0..1] → drives `t_index_list` (see mapping).
+        - **Creativity** [0..1] and **Quality** [0..1] → drives `t_index_list` (see mapping).
 5. **Capture**
     - **Hold-to-record** from **3–10s**. On release, create a **Livepeer clip** (server-side) for that duration ending “now”. Show progress → success.
 6. **Share**
@@ -69,44 +69,14 @@ Mobile-first microsite for the **Realtime AI Video Summit (Open Source AI Week)*
 - **Texture** → IP-Adapter (single):
     - Always have Ipadapters enabled in the params. You will only change the scale which should be 0 when disabled.
     - If a texture is selected, there also a 0-1 scale slider
-- **Intensity / Quality → `t_index_list` (SDXL diffusion timestep control)**
-    - **Two-stage interpolation**: First intensity, then quality
-    
-    - **Stage 1 - Intensity** `∈ [1..10]` determines base stylization:
-        - **Intensity 1** (low): Base targets `[30, 35, 40, 45]` - refined/realistic
-        - **Intensity 10** (high): Base targets `[6, 12, 18, 24]` - heavily stylized
-        - Linear interpolation: `base[i] = high[i] + (low[i] - high[i]) * (10 - intensity) / 9`
-        - Defaults to 5 (balanced: `[19, 25, 30, 36]` at quality range boundaries)
-    
-    - **Stage 2 - Quality** `∈ [0..1]` determines steps AND refines values:
-        - **Step count** (number of t_index values):
-            - `quality < 0.25` → 1 step
-            - `quality < 0.50` → 2 steps
-            - `quality < 0.75` → 3 steps
-            - `quality ≥ 0.75` → 4 steps
-        - **Within each range**, quality interpolates each value toward the next:
-            - At range start (0.25, 0.50, 0.75): Use base values from intensity
-            - As quality increases: Each index value moves toward next index value
-            - Last index: Extrapolates by extending with same spacing
-        - Defaults to 0.4 (2 steps, mid-range interpolation)
-    
-    - **Simple explanation**: 
-        - Quality slider does TWO things: (1) adds more steps at thresholds, (2) smoothly shifts values upward between thresholds
-        - Higher quality = more computation AND more refinement (values shift toward higher t_index)
-    
-    - **Examples**:
-        - Intensity 10, Quality 0.25: `[6, 12]` - high intensity, 2 steps
-        - Intensity 10, Quality 0.50: `[6, 12, 18]` - add 3rd step
-        - Intensity 10, Quality 0.75: `[6, 12, 18, 24]` - add 4th step
-        - Intensity 10, Quality 1.0: `[12, 18, 24, 30]` - all values shifted up (more refined)
-        - Intensity 1, Quality 0.75: `[30, 35, 40, 45]` - low intensity, 4 steps
-        - Intensity 1, Quality 1.0: `[35, 40, 45, 50]` - values shifted up (maximum refinement)
-    
-    - **Rationale**: 
-        - Higher t_index values (later diffusion timesteps) = more refinement, less AI stylization
-        - Lower t_index values (earlier timesteps) = more AI effects, more psychedelic
-        - Quality's dual role: computational cost (steps) + visual refinement (value shifting)
-        - Smooth, continuous control over the full intensity×quality space
+- **Creativity / Quality → `t_index_list` (SDXL heuristic)**
+    - `quality ∈ [0..1]` → **count** and **max index**:
+        - low (<.25) → base `[6]`; mid (<.50) → `[6,12]`; high `(.75)`→ `[6,12,18]` ; super high →`[6,12,18,24]`
+        - In between each range, increasing quality should scale the base proportionality until each index becomes the next multiple of 6. [E.g](http://E.gm). .5 should actually use [12,18] base (only >.5 becomes 3 indexes). It scales linearly from the [6,12] at ~.25
+        - Defaults to 0.4
+    - `creativity ∈ [1..10]` scales indices: `scale = 2.62 - 0.132*creativity` (higher creativity → lower indices). Defaults to 5
+    - Final `t_index_list = round(base_i * scale)`, clamped `[0..50]`.
+    - Rationale: higher/later indices bias refinement; earlier indices increase stylization. If any value invalid, fall back to `[4,12,20]`.
 - **Other**: keep ControlNets enabled with **conditioning_scale** (use 0 to “disable”), never flip `enabled` (avoids reload). (Matches template guidance.). Keep default set to start with, hard coded, but should be easy to change.
 - The created clips should also register the exact params that were used during the recording (both high-level app inputs and generated stream params from them)
 
@@ -140,7 +110,7 @@ Secrets:
 Routes (prefix `/functions/v1`):
 
 1. `POST /daydream-stream` → proxy → `https://api.daydream.live/v1/streams` (body: `{pipeline_id}`) → returns `{id, output_playback_id, whip_url}`.
-2. `POST /daydream-prompt` → proxy → `PATCH /v1/streams/:id` (body: `{params: {...}}`).
+2. `POST /daydream-prompt` → proxy → `/beta/streams/:id/prompts` (send full body per current API).
 3. `POST /studio-request-upload` → calls Livepeer **Request Upload** API → returns `{uploadUrl, assetId, tus}` (pre-signed upload URL).
 4. `POST /studio-asset-status` → body `{ assetId }` → GET Livepeer asset status → returns `{status, playbackId, downloadUrl}`.
 5. `POST /save-clip` → body `{ assetId, playbackId, downloadUrl, durationMs, session_id, prompt, texture_id, texture_weight, t_index_list }` → inserts into `clips` table → returns clip record.
