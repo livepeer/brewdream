@@ -131,9 +131,9 @@ These are **non-negotiable** technical requirements:
 4. **AI Effect Controls** (Capture.tsx):
    - **Prompt**: Text description of style
    - **Texture**: Optional image overlay (8 presets)
-   - **Intensity** (1-10): Controls stylization strength via `t_index_list` (1=low/refined, 10=high/stylized)
-   - **Quality** (0-1): Two-stage control - (1) number of steps at thresholds, (2) continuous value interpolation within ranges
-   - **t_index_list**: Two-stage interpolation - intensity sets base values, quality shifts them toward higher indices
+   - **Creativity** (1-10): Controls denoise strength via `t_index_list`
+   - **Quality** (0-1): Number of diffusion steps (0.25=1 step, 1.0=4 steps)
+   - **t_index_list**: `[6, 12, 18, 24]` scaled by creativity (formula: `2.62 - 0.132 * creativity`)
 
 5. **Clip Recording** (recording.ts + Capture.tsx):
    - **Button behavior**: Desktop (click toggle), Mobile (press & hold)
@@ -153,7 +153,7 @@ These are **non-negotiable** technical requirements:
 7. **Database Save** (recording.ts):
    - Look up session ID from stream
    - Save clip metadata via `save-clip` edge function
-   - Includes prompt, texture, intensity/quality params, duration
+   - Includes prompt, texture, creativity/quality params, duration
    - Navigate to clip page
 
 8. **Share & Reward** (ClipView.tsx):
@@ -283,7 +283,7 @@ All functions have `verify_jwt: false` (public access)
 - **Debounced updates**: 500ms delay on input change
 - **Auto-apply**: Changes trigger immediate stream update
 - **Texture overlay**: Optional, 8 presets, weight slider (0-1)
-- **Intensity/Quality**: Abstract sliders that map to diffusion parameters (Intensity is coffee-themed)
+- **Creativity/Quality**: Abstract sliders that map to diffusion parameters
 
 ### Ticket Redemption (ClipView.tsx)
 - **Interactive validation**: Bartender swipes down on user's phone to redeem
@@ -413,56 +413,25 @@ const clip = await saveClipToDatabase({ assetId, playbackId, ... });
 
 ## 🎯 Key Business Logic
 
-### T-Index Calculation (Intensity/Quality)
-**Two-stage interpolation: Intensity → Quality**
+### T-Index Calculation (Creativity/Quality)
+**Matches PRD § "Controls → parameter mapping"**
 
 ```typescript
-// STAGE 1: Intensity interpolation (base values at quality range boundaries)
-// Intensity [1..10] determines stylization level (defaults to 5)
-low_intensity_target = [30, 35, 40, 45]   // intensity=1 (low/refined)
-high_intensity_target = [6, 12, 18, 24]   // intensity=10 (high/stylized)
-base[i] = high[i] + (low[i] - high[i]) * (10 - intensity) / 9
+// Quality [0..1] determines number of diffusion steps (defaults to 0.4)
+quality < 0.25 → [6]              (1 step, fastest)
+quality < 0.50 → [6, 12]          (2 steps)
+quality < 0.75 → [6, 12, 18]      (3 steps)
+quality ≥ 0.75 → [6, 12, 18, 24]  (4 steps, best quality)
 
-// STAGE 2: Quality interpolation (step count + value shifting)
-// Quality [0..1] has dual role (defaults to 0.4):
+// Creativity [1..10] scales the indices (defaults to 5)
+// Higher creativity → lower indices → more stylization
+scale = 2.62 - 0.132 * creativity
+t_index = base_index * scale (clamped 0-50, rounded)
 
-// (A) Step count at thresholds:
-quality < 0.25 → 1 step   (first value only)
-quality < 0.50 → 2 steps  (first two values)
-quality < 0.75 → 3 steps  (first three values)
-quality ≥ 0.75 → 4 steps  (all four values)
-
-// (B) Continuous interpolation within each range:
-// - Calculate progress within range: qualityProgress = (quality - rangeStart) / 0.25
-// - Each value interpolates toward the next:
-//     • Indices 0-2: interpolate toward next index value
-//     • Last index: extrapolate using same spacing as previous step
-// - Formula: result[i] = base[i] + (nextValue[i] - base[i]) * qualityProgress
-
-// SIMPLE EXPLANATION:
-// Quality does TWO things:
-//   1. Adds more steps when crossing thresholds (0.25, 0.50, 0.75)
-//   2. Smoothly shifts all values upward within each range (more refinement)
-
-// Examples (showing quality's dual effect):
-Intensity 10, Quality 0.25: [6, 12]          // 2 steps, base values
-Intensity 10, Quality 0.375: [9, 15]         // 2 steps, values shifted up
-Intensity 10, Quality 0.50: [6, 12, 18]      // 3 steps, base values
-Intensity 10, Quality 0.75: [6, 12, 18, 24]  // 4 steps, base values
-Intensity 10, Quality 1.0: [12, 18, 24, 30]  // 4 steps, all shifted up (max refinement)
-
-Intensity 1, Quality 0.75: [30, 35, 40, 45]  // 4 steps, low intensity base
-Intensity 1, Quality 1.0: [35, 40, 45, 50]   // 4 steps, shifted to maximum refinement
-
-Intensity 5, Quality 0.75: [19, 25, 30, 36]  // 4 steps, balanced
-Intensity 5, Quality 1.0: [25, 30, 36, 41]   // 4 steps, shifted upward
-
-// Rationale:
-// - Higher t_index values (later diffusion timesteps) = more refinement/realism
-// - Lower t_index values (earlier timesteps) = more AI stylization/effects
-// - Two-stage approach: intensity sets character, quality adds both steps and refinement
-// - Smooth continuous control over entire intensity×quality parameter space
-// - At quality=1.0, maximum refinement regardless of intensity level
+// Rationale (from PRD):
+// - Higher/later indices bias refinement
+// - Earlier indices increase stylization
+// - Fallback: [4, 12, 20] if any value invalid
 ```
 
 ### Clip Duration Enforcement
@@ -836,7 +805,7 @@ Avoid:
 - Camera selector (front/back) with permission prompts
 - Live output (1:1 square) with PiP source preview via Livepeer Player SDK v4
 - Manual src construction for Daydream playback IDs
-- Prompt, Texture+Weight, Intensity, Quality controls with debounced updates
+- Prompt, Texture+Weight, Creativity, Quality controls with debounced updates
 - Recording with `captureStream()` + `MediaRecorder` (3-10s duration enforcement)
 - Desktop (click toggle) vs Mobile (press & hold) recording mechanics
 - Real-time recording counter (100ms updates)

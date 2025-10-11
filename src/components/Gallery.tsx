@@ -61,7 +61,7 @@ export function Gallery() {
               <h1 className="text-balance mb-6 bg-gradient-to-r from-foreground via-foreground/80 to-foreground/40 bg-clip-text text-5xl font-extrabold text-transparent md:text-6xl">Brew your dream</h1>
               <p className="mx-auto max-w-2xl text-balance text-lg text-muted-foreground">
                 Create a clip and show it at the booth to win a{" "}
-                <strong className="font-bold text-foreground">free coffee</strong>. Share your clips and get
+                <strong className="font-bold text-foreground">free coffee</strong>. Share your creativity and get
                 rewarded!
               </p>
             </div>
@@ -104,7 +104,7 @@ export function Gallery() {
             <p className="mx-auto max-w-2xl text-balance text-lg text-muted-foreground">
               Create a clip and show it at the booth to win a{" "}
               <strong className="font-bold text-foreground">free coffee</strong>.
-              Share your clips and get rewarded!
+              Share your creativity and get rewarded!
             </p>
           </div>
   
