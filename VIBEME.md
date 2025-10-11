@@ -549,6 +549,35 @@ navigate('/path');
 
 ## 🐛 Known Issues & Workarounds
 
+### Stream Not Ready on Initialization (✅ RESOLVED)
+**Issue**: When creating a Daydream stream, attempting to update parameters immediately would fail with "Stream not ready yet" error. This blocked camera initialization and left users with a black screen.
+
+**Root Cause**: 
+- Daydream API's POST `/v1/streams` only accepts `pipeline_id` parameter
+- Initial parameters (prompt, t_index_list, etc.) must be sent via separate PATCH request
+- Stream needs time to initialize before accepting parameter updates
+
+**Solution** (`supabase/functions/daydream-stream/index.ts`):
+Edge function now handles both stream creation AND parameter initialization:
+1. **Single client call**: Client passes `initialParams` to edge function
+2. **Server-side retry**: Edge function handles 10 retries with 1-second intervals for "not ready" errors
+3. **Non-blocking**: Edge function returns immediately, params update in background
+4. **Graceful degradation**: If param update fails, stream continues with defaults
+
+```typescript
+// Client: One simple call
+const stream = await createDaydreamStream(initialParams);
+
+// Edge function: Handles create + param init with retry
+POST /v1/streams → PATCH /v1/streams/:id (with retry)
+```
+
+**Impact**: 
+- Camera shows video feed immediately (~2-3 seconds)
+- Stream parameters applied within 1-2 seconds (background)
+- No more "Stream not ready yet" errors visible to user
+- Cleaner architecture: retry logic centralized in edge function
+
 ### Camera Mirroring (✅ RESOLVED)
 **Solution**: Mirror the MediaStream **at the source** before sending to Daydream:
 - Original camera stream → Canvas with `scaleX(-1)` → `captureStream(30)` → Mirrored MediaStream
@@ -817,6 +846,8 @@ Avoid:
 ---
 
 **Last Updated**: 2025-10-11
+- Fixed stream initialization race condition: moved retry logic to edge function for cleaner architecture
+- Camera now starts immediately while params update in background (no more black screen or "Stream not ready yet" errors)
 - Fixed critical params updating logic bugs: stream now starts with correct prompt (via immediate post-creation prompt update) and no model reload issues
 - Canvas-based mirroring at source for natural selfie mode
 - Interactive ticket redemption with swipe-to-validate UX

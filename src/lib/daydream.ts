@@ -39,28 +39,20 @@ export interface StreamDiffusionParams {
 
 /**
  * Create a new Daydream stream with the StreamDiffusion pipeline
- * If initialParams provided, immediately updates the stream with those params
+ * If initialParams provided, the edge function handles parameter initialization with retry logic
  */
 export async function createDaydreamStream(initialParams?: StreamDiffusionParams): Promise<DaydreamStream> {
-  // Step 1: Create stream (only accepts pipeline_id)
   const { data, error } = await supabase.functions.invoke('daydream-stream', {
     body: { 
-      pipeline_id: 'pip_SDXL-turbo' // Correct SDXL pipeline ID
+      pipeline_id: 'pip_SDXL-turbo',
+      initialParams // Edge function handles param initialization
     }
   });
 
   if (error) throw error;
   if (!data) throw new Error('No stream data returned');
 
-  const stream = data as DaydreamStream;
-
-  // Step 2: Immediately update with initial params if provided
-  // This prevents the stream from starting with Daydream defaults
-  if (initialParams) {
-    await updateDaydreamPrompts(stream.id, initialParams);
-  }
-
-  return stream;
+  return data as DaydreamStream;
 }
 
 /**
