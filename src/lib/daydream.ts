@@ -144,27 +144,28 @@ export async function updateDaydreamPrompts(
   params: StreamDiffusionParams
 ): Promise<void> {
   // Ensure every controlnet includes enabled: true as required by Daydream API
+  // Higher conditioning scales for better consistency and reduced flicker
   const defaultControlnets = [
     {
       enabled: true,
       model_id: 'xinsir/controlnet-depth-sdxl-1.0',
       preprocessor: 'depth_tensorrt',
       preprocessor_params: {},
-      conditioning_scale: 0.3,
+      conditioning_scale: 0.6, // Increased from 0.3 for stronger structural consistency
     },
     {
       enabled: true,
       model_id: 'xinsir/controlnet-canny-sdxl-1.0',
       preprocessor: 'canny',
       preprocessor_params: {},
-      conditioning_scale: 0,
+      conditioning_scale: 0.3, // Enabled (was 0) for edge preservation
     },
     {
       enabled: true,
       model_id: 'xinsir/controlnet-tile-sdxl-1.0',
       preprocessor: 'feedback',
       preprocessor_params: {},
-      conditioning_scale: 0,
+      conditioning_scale: 0.2, // Enabled (was 0) for temporal consistency
     },
   ];
 

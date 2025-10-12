@@ -1,5 +1,26 @@
 # Stream Diffusion Integration Guide
 
+> ⚠️ **WARNING: This document contains OUTDATED information!**
+>
+> **DO NOT USE as reference for this project!** This guide documents deprecated APIs and incorrect default values.
+>
+> **Specifically INVALID:**
+> - ❌ The "Default Values" section shows `stabilityai/sd-turbo` with SD 2.1 controlnets (`thibaud/controlnet-sd21-*`)
+> - ❌ We use `pip_SDXL-turbo` with SDXL controlnets (`xinsir/controlnet-*-sdxl-1.0`)
+> - ❌ The `/beta/streams/:id/prompts` endpoint is deprecated
+> - ❌ RTMP examples are outdated (we use WHIP/WebRTC)
+>
+> **What IS valid:**
+> - ✅ TypeScript type definitions (ControlNetConfig, StreamDiffusionParams structures)
+> - ✅ General concepts about `conditioning_scale` and hot-swappable parameters
+>
+> **For actual implementation, see:**
+> - `src/lib/daydream.ts` - Correct pipeline and controlnet configuration
+> - `src/pages/Capture.tsx` - Live implementation with correct SDXL controlnets
+> - `docs/DAYDREAM_INTEGRATION.md` - Current WHIP/WebRTC integration guide
+>
+> ---
+
 ## Create a Stream
 
 Use the Stream Diffusion pipeline (pip_qpUgXycjWF6YMeSL) to create a new stream. This returns a `stream_key` to push RTMP video and a `playback_id` to view the stream via HLS.
@@ -179,7 +200,14 @@ Call the stream status endpoint e.g. [`curl https://pipelines.livepeer.monster/a
 
 ## Update Stream Params
 
-This endpoint allows you to update generation parameters mid-stream.
+> ⚠️ **DEPRECATED ENDPOINT!** The `/beta/streams/:id/prompts` endpoint shown below is outdated.
+> 
+> **Current API:** Use `PATCH /v1/streams/:id` with `{params: {...}}` structure.
+> 
+> See `supabase/functions/daydream-prompt/index.ts` for actual implementation.
+
+<details>
+<summary>❌ OUTDATED: Old API example (DO NOT USE)</summary>
 
 ### Example Request
 
@@ -217,6 +245,8 @@ curl -X POST \
   }'
 
 ```
+
+</details>
 
 Ensure both `DAYDREAM_API_KEY` and `STREAM_ID` are exported in your environment.
 
@@ -295,9 +325,19 @@ If using Python, you can copy the pydantic types defined [here](https://github.c
 
 ### Default Values
 
-No need to specify any values that are already the default (e.g. `model_id`, sd-turbo being the only current one with controlnet support).
+> ⚠️ **INVALID FOR THIS PROJECT!** 
+> 
+> The values below are for the OLD `stabilityai/sd-turbo` model with SD 2.1 controlnets.
+> 
+> **We use `pip_SDXL-turbo`** with these SDXL controlnets instead:
+> - `xinsir/controlnet-depth-sdxl-1.0` (conditioning_scale: 0.6)
+> - `xinsir/controlnet-canny-sdxl-1.0` (conditioning_scale: 0.3)
+> - `xinsir/controlnet-tile-sdxl-1.0` (conditioning_scale: 0.2)
+>
+> See `src/lib/daydream.ts` for actual implementation.
 
-The supported ControlNet models are all the ones specified on the default values as well.
+<details>
+<summary>❌ OUTDATED: Old sd-turbo defaults (DO NOT USE)</summary>
 
 ```json
 {
@@ -377,7 +417,11 @@ The supported ControlNet models are all the ones specified on the default values
 }
 ```
 
+</details>
+
 ### JSON Schema
+
+> ⚠️ **PARTIALLY OUTDATED:** The schema structure is valid, but default controlnet models listed are for SD 2.1, not SDXL.
 
 ```yaml
 title: StreamDiffusionParams
