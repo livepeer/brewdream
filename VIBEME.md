@@ -45,10 +45,12 @@
 |-------------------|-------------|
 | Overall architecture | This file (VIBEME.md) |
 | Product requirements | `PRD.md` |
+| **Documentation standards** | **`docs/DOCUMENTATION_GUIDELINES.md`** |
 | Daydream API details | `docs/DAYDREAM_API_GUIDE.md` |
 | WHIP/WebRTC setup | `docs/DAYDREAM_INTEGRATION.md` |
 | Recording/upload flow | `docs/RECORDING_IMPLEMENTATION.md` |
 | Auth implementation | `docs/ANONYMOUS_AUTH.md` |
+| Local download toggle | `docs/LOCAL_DOWNLOAD_TOGGLE.md` |
 | Core stream logic | `src/lib/daydream.ts` |
 | Core recording logic | `src/lib/recording.ts` |
 | Main capture UI | `src/pages/Capture.tsx` |
@@ -651,6 +653,9 @@ navigate('/path');
 - [ ] Integration requires detailed API documentation
 - [ ] Debugging complex issues (preserve learnings)
 - [ ] Low-level implementation details agents need
+- [ ] Development toggles, hidden features, non-obvious functionality
+
+**⚠️ IMPORTANT**: Be concise - tokens cost money. See [`docs/DOCUMENTATION_GUIDELINES.md`](./docs/DOCUMENTATION_GUIDELINES.md)
 
 **Do NOT update VIBEME for**:
 - Minor bug fixes (unless they reveal architectural quirks)
