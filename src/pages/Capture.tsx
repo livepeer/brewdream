@@ -163,6 +163,7 @@ export default function Capture() {
   const [textureWeight, setTextureWeight] = useState([0.5]);
   const [creativity, setCreativity] = useState([5]);
   const [quality, setQuality] = useState([0.4]);
+  const [texturePopoverOpen, setTexturePopoverOpen] = useState(false);
 
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -1284,7 +1285,7 @@ export default function Capture() {
               </label>
 
               <div className="flex items-center gap-4">
-                <Popover>
+                <Popover open={texturePopoverOpen} onOpenChange={setTexturePopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -1312,7 +1313,10 @@ export default function Capture() {
                   >
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                       <Button
-                        onClick={() => setSelectedTexture(null)}
+                        onClick={() => {
+                          setSelectedTexture(null);
+                          setTexturePopoverOpen(false);
+                        }}
                         variant={selectedTexture === null ? "default" : "outline"}
                         className={`aspect-square ${
                           selectedTexture === null
@@ -1325,7 +1329,10 @@ export default function Capture() {
                       {TEXTURES.map((texture) => (
                         <Button
                           key={texture.id}
-                          onClick={() => setSelectedTexture(texture.id)}
+                          onClick={() => {
+                            setSelectedTexture(texture.id);
+                            setTexturePopoverOpen(false);
+                          }}
                           variant={selectedTexture === texture.id ? "default" : "outline"}
                           className={`aspect-square p-0 overflow-hidden ${
                             selectedTexture === texture.id
