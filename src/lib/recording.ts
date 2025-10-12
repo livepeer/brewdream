@@ -109,6 +109,8 @@ export class VideoRecorder {
         setTimeout(() => resolve(), 100);
       };
 
+      // Request any remaining data before stopping to ensure all chunks are flushed
+      this.recorder!.requestData();
       this.recorder!.stop();
     });
 
