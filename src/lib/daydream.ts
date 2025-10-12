@@ -47,7 +47,7 @@ export async function createDaydreamStream(initialParams?: StreamDiffusionParams
   const { data, error } = await supabase.functions.invoke('daydream-stream', {
     body: { 
       pipeline_id: 'pip_SDXL-turbo',
-      initialParams // Edge function handles param initialization
+      initialParams // Will be sent as pipeline_params to Daydream
     }
   });
 

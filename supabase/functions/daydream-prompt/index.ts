@@ -10,7 +10,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  console.log('[EDGE] daydream-prompt function called (version: 2025-10-11-debug)');
+  console.log('[EDGE] daydream-prompt function called (version: 2025-10-12-correct-api-endpoint)');
 
   try {
     const DAYDREAM_API_KEY = Deno.env.get('DAYDREAM_API_KEY');
@@ -26,8 +26,7 @@ serve(async (req) => {
     console.log('[EDGE] Updating prompt for stream:', streamId);
     console.log('[EDGE] Params being sent:', JSON.stringify(promptBody, null, 2));
 
-    // Send the params body as-is to the PATCH endpoint
-    // The body should be in format: { params: { ... } }
+    // PATCH /v1/streams/:id with body: { params: { ... } }
     const response = await fetch(`https://api.daydream.live/v1/streams/${streamId}`, {
       method: 'PATCH',
       headers: {
@@ -43,8 +42,13 @@ serve(async (req) => {
 
     if (!response.ok) {
       console.error('[EDGE] Daydream API error:', JSON.stringify(data, null, 2));
-      return new Response(JSON.stringify({ error: data }), {
-        status: response.status,
+      // Pass through the full Daydream error response to frontend
+      return new Response(JSON.stringify({ 
+        error: 'Daydream API Error',
+        daydreamError: data,
+        status: response.status 
+      }), {
+        status: 400, // Use 400 instead of passing through 404, so frontend sees it as error not "not found"
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
