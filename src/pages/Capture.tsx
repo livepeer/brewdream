@@ -958,9 +958,15 @@ export default function Capture() {
   // Handle tab visibility changes - stop streams when user leaves tab (mobile only)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      // Only stop streams on mobile where tabs actually go to background
+      // Detect actual mobile/tablet devices (not just screen size)
+      // Check for touch capability and mobile user agent patterns
+      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const mobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isActualMobileDevice = hasTouch || mobileUserAgent;
+
+      // Only stop streams on actual mobile devices where tabs go to background
       // On desktop, let the stream continue running even if tab is in background
-      if (!isMobile) {
+      if (!isActualMobileDevice) {
         return;
       }
 
@@ -1008,7 +1014,7 @@ export default function Capture() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isMobile, cameraType, playbackId, prompt, stopAllMediaStreams, initializeStream, toast]);
+  }, [cameraType, playbackId, prompt, stopAllMediaStreams, initializeStream, toast]);
 
   // Show reassuring message if stream takes longer than 10s to load
   useEffect(() => {
