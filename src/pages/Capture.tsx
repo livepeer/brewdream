@@ -955,12 +955,18 @@ export default function Capture() {
     };
   }, [stopAllMediaStreams]);
 
-  // Handle tab visibility changes - stop streams when user leaves tab
+  // Handle tab visibility changes - stop streams when user leaves tab (mobile only)
   useEffect(() => {
     const handleVisibilityChange = () => {
+      // Only stop streams on mobile where tabs actually go to background
+      // On desktop, let the stream continue running even if tab is in background
+      if (!isMobile) {
+        return;
+      }
+
       if (document.hidden) {
         // User left the tab - record the time and stop streams immediately
-        console.log('Tab hidden - stopping media streams for privacy');
+        console.log('Tab hidden (mobile) - stopping media streams for privacy');
         tabHiddenTimeRef.current = Date.now();
         wasStreamActiveRef.current = !!playbackId; // Remember if we had an active stream
 
@@ -1002,7 +1008,7 @@ export default function Capture() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [cameraType, playbackId, prompt, stopAllMediaStreams, initializeStream, toast]);
+  }, [isMobile, cameraType, playbackId, prompt, stopAllMediaStreams, initializeStream, toast]);
 
   // Show reassuring message if stream takes longer than 10s to load
   useEffect(() => {
