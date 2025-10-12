@@ -207,7 +207,7 @@ export default function Capture() {
    */
   const stopAllMediaStreams = useCallback(() => {
     console.log('Stopping all media streams...');
-    
+
     // Stop all tracks in the original stream
     if (originalStreamRef.current) {
       originalStreamRef.current.getTracks().forEach(track => {
@@ -248,11 +248,11 @@ export default function Capture() {
     try {
       // Calculate initial t_index_list based on default creativity and quality
       const initialTIndexList = calculateTIndexList(creativity[0], quality[0]);
-      
+
       // Create Daydream stream with initial params to avoid default psychedelic
       console.log('[CAPTURE] Creating stream with initial prompt:', initialPrompt);
       console.log('[CAPTURE] Initial t_index_list:', initialTIndexList);
-      
+
       const initialParams: StreamDiffusionParams = {
         model_id: 'stabilityai/sdxl-turbo',
         prompt: initialPrompt,
@@ -293,7 +293,7 @@ export default function Capture() {
           insightface_model_name: 'buffalo_l',
         },
       };
-      
+
       console.log('[CAPTURE] About to create stream with initialParams:', JSON.stringify(initialParams, null, 2));
       const streamData = await createDaydreamStream(initialParams);
       console.log('[CAPTURE] Stream created successfully:', streamData);
@@ -371,15 +371,15 @@ export default function Capture() {
     const audioContext = new AudioContext();
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
-    
+
     // Set volume to 0 (silent)
     gainNode.gain.value = 0;
-    
+
     oscillator.connect(gainNode);
     const destination = audioContext.createMediaStreamDestination();
     gainNode.connect(destination);
     oscillator.start();
-    
+
     return destination.stream.getAudioTracks()[0];
   };
 
@@ -434,7 +434,7 @@ export default function Capture() {
       // Request both camera and microphone permissions upfront
       let originalStream: MediaStream;
       let hasAudioPermission = false;
-      
+
       try {
         originalStream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -473,7 +473,7 @@ export default function Capture() {
         // We have mic permission - use the real audio track but start disabled
         realAudioTrackRef.current = audioTracks[0];
         realAudioTrackRef.current.enabled = false; // Mic off by default
-        
+
         // Make sure the audio track is in the video stream
         if (!videoStream.getAudioTracks().find(t => t.id === realAudioTrackRef.current!.id)) {
           videoStream.addTrack(realAudioTrackRef.current);
@@ -482,7 +482,7 @@ export default function Capture() {
         // No mic permission - use silent audio track
         const silentTrack = createSilentAudioTrack();
         silentAudioTrackRef.current = silentTrack;
-        
+
         // Remove any existing audio tracks and add silent one
         videoStream.getAudioTracks().forEach(track => {
           videoStream.removeTrack(track);
@@ -511,25 +511,25 @@ export default function Capture() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const audioTrack = stream.getAudioTracks()[0];
-        
+
         if (audioTrack && pcRef.current) {
           // Replace the silent track with the real one (only time we replace)
           const senders = pcRef.current.getSenders();
           const audioSender = senders.find(sender => sender.track?.kind === 'audio');
-          
+
           if (audioSender && silentAudioTrackRef.current) {
             await audioSender.replaceTrack(audioTrack);
             realAudioTrackRef.current = audioTrack;
             realAudioTrackRef.current.enabled = true;
-            
+
             // Stop the old silent track
             silentAudioTrackRef.current.stop();
             silentAudioTrackRef.current = null;
-            
+
             setMicPermissionGranted(true);
             setMicPermissionDenied(false);
             setMicEnabled(true);
-            
+
             toast({
               title: 'Microphone enabled',
               description: 'Now streaming live audio',
@@ -553,7 +553,7 @@ export default function Capture() {
       const newEnabledState = !micEnabled;
       realAudioTrackRef.current.enabled = newEnabledState;
       setMicEnabled(newEnabledState);
-      
+
       toast({
         title: newEnabledState ? 'Microphone enabled' : 'Microphone disabled',
         description: newEnabledState ? 'Now streaming live audio' : 'Microphone muted',
@@ -779,7 +779,7 @@ export default function Capture() {
       // Upload to Livepeer Studio with progress tracking
       const filename = `daydream-clip-${Date.now()}.webm`;
       const { assetId, playbackId: assetPlaybackId, downloadUrl } = await uploadToLivepeer(
-        blob, 
+        blob,
         filename,
         (progress) => {
           setUploadProgress(progress.step || progress.phase);
@@ -963,10 +963,10 @@ export default function Capture() {
         console.log('Tab hidden - stopping media streams for privacy');
         tabHiddenTimeRef.current = Date.now();
         wasStreamActiveRef.current = !!playbackId; // Remember if we had an active stream
-        
+
         // Stop all media streams immediately for privacy/safety
         stopAllMediaStreams();
-        
+
         // Clear the playback and stream state to show loading when they return
         setPlaybackId(null);
         setStreamId(null);
@@ -978,7 +978,7 @@ export default function Capture() {
         if (tabHiddenTimeRef.current && wasStreamActiveRef.current) {
           const timeAway = Date.now() - tabHiddenTimeRef.current;
           console.log(`Tab visible again after ${timeAway}ms away`);
-          
+
           // If user was gone for more than 5 seconds, restart the stream
           if (timeAway > 5000 && cameraType) {
             console.log('User was away >5s, restarting stream...');
@@ -989,7 +989,7 @@ export default function Capture() {
             // Restart the stream with the same camera type and current prompt
             initializeStream(cameraType, prompt);
           }
-          
+
           // Reset the tracking variables
           tabHiddenTimeRef.current = null;
           wasStreamActiveRef.current = false;
@@ -1160,9 +1160,9 @@ export default function Capture() {
               size="icon"
               variant={micEnabled ? "default" : "secondary"}
               className={`w-12 h-12 rounded-full shadow-lg transition-all duration-200 ${
-                micEnabled 
-                  ? 'bg-green-600 hover:bg-green-700 text-white' 
-                  : micPermissionDenied 
+                micEnabled
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : micPermissionDenied
                     ? 'bg-red-600 hover:bg-red-700 text-white'
                     : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200'
               }`}
@@ -1203,8 +1203,15 @@ export default function Capture() {
             onPointerDown={isMobile ? startRecording : undefined}
             onPointerUp={isMobile ? stopRecording : undefined}
             onPointerLeave={isMobile ? stopRecording : undefined}
+            onContextMenu={(e) => e.preventDefault()}
             disabled={loading || uploadingClip || !playbackId || !captureSupported || !isPlaying}
-            className="w-full h-14 bg-gradient-to-r from-neutral-200 to-neutral-500 text-neutral-900 font-semibold rounded-2xl hover:from-neutral-300 hover:to-neutral-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-14 bg-gradient-to-r from-neutral-200 to-neutral-500 text-neutral-900 font-semibold rounded-2xl hover:from-neutral-300 hover:to-neutral-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed select-none touch-manipulation"
+            style={{
+              WebkitUserSelect: 'none',
+              WebkitTouchCallout: 'none',
+              userSelect: 'none',
+              touchAction: 'manipulation'
+            }}
           >
             {recording ? (
               <span className="flex items-center gap-2">
