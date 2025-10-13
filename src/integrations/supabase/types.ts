@@ -161,21 +161,18 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string | null
-          email_verified: boolean | null
           id: string
           twitter_handle: string | null
         }
         Insert: {
           created_at?: string | null
           email?: string | null
-          email_verified?: boolean | null
           id?: string
           twitter_handle?: string | null
         }
         Update: {
           created_at?: string | null
           email?: string | null
-          email_verified?: boolean | null
           id?: string
           twitter_handle?: string | null
         }

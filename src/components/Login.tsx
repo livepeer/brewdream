@@ -5,14 +5,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Mail } from 'lucide-react';
 
 export function Login() {
   const [email, setEmail] = useState('');
-  // Separate loading flags so one action doesn't lock the whole form
-  const [anonLoading, setAnonLoading] = useState(false);
-  const [emailLoading, setEmailLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -37,63 +35,66 @@ export function Login() {
   }, [navigate]);
 
   const handleAnonymousLogin = async () => {
-    setAnonLoading(true);
+    setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInAnonymously();
+
       if (error) throw error;
 
-      // Ensure the app-level user row exists BEFORE redirecting
+      // Store anonymous user in users table (no email)
       if (data.user) {
         const { error: insertError } = await supabase
           .from('users')
-          .upsert({ id: data.user.id, email: null }, { onConflict: 'id' });
-        if (insertError) throw insertError;
+          .upsert({
+            id: data.user.id,
+            email: null
+          }, { onConflict: 'id' });
+
+        if (insertError) {
+          console.error('Failed to create user record:', insertError);
+          throw new Error(`Failed to create user record: ${insertError.message}`);
+        }
       }
 
-      toast({ title: 'Welcome!', description: 'You can start creating clips right away' });
+      toast({
+        title: 'Welcome!',
+        description: 'You can start creating clips right away',
+      });
+
       navigate('/capture');
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
     } finally {
-      setAnonLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleSendMagicLink = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEmailLoading(true);
+    setLoading(true);
 
     try {
-      // Get current session to check if user is anonymous
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUserId = session?.user?.id;
-
-      // Create user record immediately with email_verified=false
-      // This allows us to track signup attempts and prevents conflicts
-      const { error: insertError } = await supabase
-        .from('users')
-        .upsert({
-          id: currentUserId || undefined, // Use current user ID if anonymous, otherwise let DB generate
-          email: email,
-          email_verified: false
-        }, { 
-          onConflict: 'email',
-          ignoreDuplicates: false 
-        });
-
-      // If there's an error and it's not a duplicate, throw it
-      if (insertError && !insertError.message.includes('duplicate')) {
-        console.error('Failed to create user record:', insertError);
-        // Don't throw here, just log the error and continue
-      }
-
-      // If user is anonymous, link their account BEFORE sending the email
-      if (isAnonymous && currentUserId) {
+      // If user is anonymous, we need to link their account
+      if (isAnonymous) {
+        // Update the anonymous user's email
         const { error: updateError } = await supabase.auth.updateUser({ email });
         if (updateError) throw updateError;
       }
 
-      // Send magic link via email
+      // Store or update user in our custom users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .upsert({ email }, { onConflict: 'email' })
+        .select()
+        .single();
+
+      if (userError) throw userError;
+
+      // Send magic link (OTP via email)
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
@@ -103,46 +104,62 @@ export function Login() {
 
       if (error) throw error;
 
-      setEmailSent(true);
+      setOtpSent(true);
       toast({
         title: 'Check your email',
-        description: 'Click the link in your email to sign in',
+        description: 'We sent you a login code',
       });
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
     } finally {
-      setEmailLoading(false);
+      setLoading(false);
     }
   };
 
-  // Handle auth state changes (when user clicks magic link)
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const wasAnonymous = session.user.is_anonymous || false;
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-        // Only mark email as verified for non-anonymous sessions
-        if (!wasAnonymous) {
-          await supabase
-            .from('users')
-            .upsert({
-              id: session.user.id,
-              email: session.user.email,
-              email_verified: true
-            }, { onConflict: 'id' });
-        }
-        
-        toast({
-          title: 'Success!',
-          description: wasAnonymous ? 'Email added to your account' : 'Logged in successfully',
-        });
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'email',
+      });
 
-        navigate('/capture');
+      if (error) throw error;
+
+      // Update users table with email
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('users')
+          .upsert({
+            id: user.id,
+            email: user.email
+          }, { onConflict: 'id' });
       }
-    });
 
-    return () => subscription.unsubscribe();
-  }, [navigate, toast]);
+      toast({
+        title: 'Success!',
+        description: isAnonymous ? 'Email added to your account' : 'Logged in successfully',
+      });
+
+      navigate('/capture');
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-background">
@@ -159,27 +176,27 @@ export function Login() {
 
 
             <h1 className="text-3xl font-bold mb-2">
-              {emailSent ? 'Check your email' : isAnonymous ? 'Add your email' : 'Sign in'}
+              {otpSent ? 'Enter code' : isAnonymous ? 'Add your email' : 'Sign in'}
             </h1>
             <p className="text-muted-foreground">
-              {emailSent
-                ? 'Click the link in your email to sign in'
+              {otpSent
+                ? 'Check your email for the login code'
                 : isAnonymous
                 ? 'Save your clips and get a coffee ticket'
                 : 'Create AI video clips in seconds'}
             </p>
 
 
-          {!emailSent ? (
+          {!otpSent ? (
             <div className="space-y-4">
               {!isAnonymous && (
                 <>
                   <Button
                     onClick={handleAnonymousLogin}
-                    disabled={anonLoading || emailLoading}
+                    disabled={loading}
                     className="w-full h-14 bg-neutral-100 text-neutral-900 mt-8 hover:bg-neutral-200 border border-border transition-colors"
                   >
-                    {anonLoading ? 'Loading...' : 'Continue without email'}
+                    {loading ? 'Loading...' : 'Continue without email'}
                   </Button>
 
                   <div className="relative">
@@ -193,7 +210,7 @@ export function Login() {
                 </>
               )}
 
-              <form onSubmit={handleSendMagicLink} className="space-y-4">
+              <form onSubmit={handleSendOtp} className="space-y-4">
                 <Input
                   type="email"
                   placeholder="your@email.com"
@@ -204,25 +221,25 @@ export function Login() {
                 />
                 <Button
                   type="submit"
-                  disabled={emailLoading || anonLoading}
+                  disabled={loading}
                   className={`w-full h-12 ${
                     isAnonymous
                       ? 'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 border border-border'
                       : 'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 border border-border'
                   }`}
                 >
-                  {emailLoading
+                  {loading
                     ? 'Sending...'
                     : isAnonymous
                     ? 'Add email & get coffee ticket'
-                    : 'Send login link'}
+                    : 'Send login code'}
                 </Button>
               </form>
 
               {isAnonymous && (
                 <Button
                   onClick={() => navigate('/capture')}
-                  disabled={anonLoading || emailLoading}
+                  disabled={loading}
                   variant="outline"
                   className="w-full h-12 border-border text-muted-foreground hover:text-foreground transition-colors"
                 >
@@ -231,29 +248,31 @@ export function Login() {
               )}
             </div>
           ) : (
-            <div className="space-y-6 py-8">
-              <div className="flex flex-col items-center justify-center space-y-4">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                  <Mail className="w-8 h-8 text-primary" />
-                </div>
-                <div className="text-center space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    We sent an email to
-                  </p>
-                  <p className="font-semibold text-foreground">{email}</p>
-                  <p className="text-sm text-muted-foreground mt-4">
-                    Click the link in the email to sign in. The link will expire in 1 hour.
-                  </p>
-                </div>
-              </div>
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
+              <Input
+                type="text"
+                placeholder="Enter 6-digit code"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                required
+                maxLength={6}
+                className="h-12 bg-card border-border text-center text-2xl tracking-widest mt-8"
+              />
               <Button
-                onClick={() => setEmailSent(false)}
-                variant="outline"
-                className="w-full h-12 border-border text-muted-foreground hover:text-foreground transition-colors"
+                type="submit"
+                disabled={loading}
+                className="w-full h-12 bg-neutral-100 text-foreground hover:bg-neutral-200 border border-border"
+              >
+                {loading ? 'Verifying...' : 'Verify code'}
+              </Button>
+              <button
+                type="button"
+                onClick={() => setOtpSent(false)}
+                className="w-full text-sm text-muted-foreground hover:text-foreground transition"
               >
                 Use a different email
-              </Button>
-            </div>
+              </button>
+            </form>
           )}
           </div>
         </div>
