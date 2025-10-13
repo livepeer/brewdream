@@ -356,17 +356,29 @@ export default function ClipView() {
     // Check if swiped left or right past threshold
     if (Math.abs(info.offset.x) > dragThreshold) {
       // Swipe successful - redeem ticket
-      await redeemTicket();
+      await redeemTicket(info.offset.x);
     } else {
       // Snap back
       swipeX.set(0);
     }
   };
 
-  const redeemTicket = async () => {
+  const redeemTicket = async (swipeDirection: number) => {
     if (!ticketCode || isRedeeming) return;
 
     setIsRedeeming(true);
+
+    // Optimistically animate ticket away to complete the swipe
+    const finalPosition = swipeDirection > 0 ? 400 : -400;
+    swipeX.set(finalPosition);
+
+    // Wait for swipe animation to finish
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Optimistically show redeemed state
+    setIsRedeemed(true);
+    swipeX.set(0);
+
     try {
       const { data, error } = await supabase.functions.invoke('redeem-ticket', {
         body: { ticketCode: ticketCode },
@@ -374,22 +386,17 @@ export default function ClipView() {
 
       if (error) throw error;
 
-      // Animate ticket away (swipe off to the side)
-      swipeX.set(swipeX.get() > 0 ? 300 : -300);
-
-      setTimeout(() => {
-        setIsRedeemed(true);
-        swipeX.set(0);
-
-        toast({
-          title: 'Ticket redeemed!',
-          description: 'Enjoy your coffee! ☕',
-        });
-      }, 500);
+      // Success - show success toast
+      toast({
+        title: 'Ticket redeemed!',
+        description: 'Enjoy your coffee! ☕',
+      });
 
     } catch (error) {
       console.error('Error redeeming ticket:', error);
-      swipeX.set(0);
+
+      // Revert optimistic update
+      setIsRedeemed(false);
 
       const errorMessage = error instanceof Error
         ? error.message
