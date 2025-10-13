@@ -63,6 +63,16 @@ serve(async (req) => {
       });
     }
 
+    console.log('Found clip:', { clipId, session_id: clip.session_id });
+
+    if (!clip.session_id) {
+      console.error('Clip has null session_id!', { clipId, clip });
+      return new Response(JSON.stringify({ error: 'Clip has no session associated' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Verify the user owns this session
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
