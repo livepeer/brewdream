@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
@@ -65,6 +65,19 @@ export default function ClipView() {
     loadViewership();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  const creationDateStr = useMemo(() => {
+    if (!clip?.created_at) return '';
+    const createdAt = new Date(clip.created_at);
+    const now = new Date();
+    const isSameDay =
+      createdAt.getFullYear() === now.getFullYear() &&
+      createdAt.getMonth() === now.getMonth() &&
+      createdAt.getDate() === now.getDate();
+    return isSameDay
+      ? createdAt.toLocaleTimeString()
+      : createdAt.toLocaleDateString();
+  }, [clip?.created_at]);
 
   const checkAuth = async () => {
     try {
@@ -416,8 +429,6 @@ export default function ClipView() {
     );
   }
 
-  console.log('clip.asset_playback_id', clip?.asset_playback_id);
-
   return (
     <div className="min-h-screen">
       <Header isAuthenticated={isAuthenticated} />
@@ -471,7 +482,8 @@ export default function ClipView() {
             >
               <h1 className="mb-3 text-3xl font-bold text-foreground">{clip.prompt}</h1>
               <p className="text-muted-foreground">
-                Duration: {(clip.duration_ms / 1000).toFixed(1)}s • Created: {new Date(clip.created_at).toLocaleDateString()}
+                Duration: {(clip.duration_ms / 1000).toFixed(1)}s • Created: {creationDateStr}
+
               </p>
             </motion.div>
 
