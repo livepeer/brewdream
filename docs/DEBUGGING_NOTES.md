@@ -13,7 +13,7 @@ This indicates two issues:
 Added logging at every step of the parameter pipeline to trace where parameters are being lost:
 
 - **Frontend (Capture.tsx)**: `[CAPTURE]` prefix
-- **Library (daydream.ts)**: `[DAYDREAM]` prefix  
+- **Library (daydream.ts)**: `[DAYDREAM]` prefix
 - **Edge Functions**: `[EDGE]` prefix
 
 ### 2. Code Review Findings
@@ -24,7 +24,7 @@ Reviewed the parameter flow and found the structure appears correct:
 2. `initializeStream()` creates `initialParams` object with:
    - model_id: 'stabilityai/sdxl-turbo'
    - prompt: selected random prompt
-   - t_index_list: calculated from creativity/quality
+   - t_index_list: calculated from intensity/quality
    - controlnets: all 3 SDXL controlnets with proper scales
    - ip_adapter: disabled by default
 3. `createDaydreamStream(initialParams)` called
@@ -103,7 +103,7 @@ Look for:
 Visual verification:
 - Does the video stream show the expected style from the random prompt?
 - When you change the prompt, does the stream style change after 500ms?
-- When you change creativity/quality, does the effect intensity change?
+- When you change intensity/quality, does the effect change?
 - When you select a texture, does it appear in the stream?
 
 ## Files Modified
@@ -151,7 +151,7 @@ Visual verification:
    - Change prompt text
    - Wait 500ms and watch logs
    - Verify stream changes visually
-   - Repeat for creativity, quality, texture
+   - Repeat for intensity, quality, texture
 
 4. **Identify Issue from Logs**
    - If params don't reach edge function → client-side issue
@@ -187,7 +187,7 @@ Stream applies parameters (hopefully!)
 All updates must include:
 - `model_id`: 'stabilityai/sdxl-turbo' (prevents model reload)
 - `prompt`: The style description
-- `t_index_list`: Calculated from creativity/quality
+- `t_index_list`: Calculated from intensity/quality
 - `controlnets`: Array of 3 SDXL controlnets
 - `ip_adapter`: Always present (enabled only with texture)
 

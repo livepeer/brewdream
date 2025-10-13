@@ -170,7 +170,7 @@ These are **non-negotiable** technical requirements:
 **AI Controls**:
 - **Prompt**: Text style description
 - **Texture**: Optional overlay (8 presets)
-- **Creativity** (1-10): Controls diffusion strength via `t_index_list` scaling
+- **Intensity** (1-10): Controls diffusion strength via `t_index_list` scaling
 - **Quality** (0-1): Number of inference steps (0.25=1, 1.0=4)
 
 **Critical Quirks**:
@@ -284,7 +284,7 @@ Two modes: **Anonymous** (instant access) + **Email OTP** (for coffee tickets)
 - **Debounced updates**: 500ms delay on input change
 - **Auto-apply**: Changes trigger immediate stream update
 - **Texture overlay**: Optional, 8 presets, weight slider (0-1)
-- **Creativity/Quality**: Abstract sliders that map to diffusion parameters
+- **Intensity/Quality**: Abstract sliders that map to diffusion parameters
 
 ### Ticket Redemption (ClipView.tsx)
 - **Interactive validation**: Bartender swipes down on user's phone to redeem
@@ -406,7 +406,7 @@ await saveClipToDatabase({ assetId, playbackId, ... });
 
 ## 🎯 Key Business Logic
 
-### T-Index Calculation (Creativity/Quality)
+### T-Index Calculation (Intensity/Quality)
 **Matches PRD § "Controls → parameter mapping"**
 
 ```typescript
@@ -416,9 +416,9 @@ quality < 0.50 → [6, 12]          (2 steps)
 quality < 0.75 → [6, 12, 18]      (3 steps)
 quality ≥ 0.75 → [6, 12, 18, 24]  (4 steps, best quality)
 
-// Creativity [1..10] scales the indices (defaults to 5)
-// Higher creativity → lower indices → more stylization
-scale = 2.62 - 0.132 * creativity
+// Intensity [1..10] scales the indices (defaults to 5)
+// Higher intensity → lower indices → more stylization
+scale = 2.62 - 0.132 * intensity
 t_index = base_index * scale (clamped 0-50, rounded)
 
 // Rationale (from PRD):
@@ -771,7 +771,7 @@ Avoid:
 - Camera selector (front/back) with permission prompts
 - Live output (1:1 square) with PiP source preview via Livepeer Player SDK v4
 - Manual src construction for Daydream playback IDs
-- Prompt, Texture+Weight, Creativity, Quality controls with debounced updates
+- Prompt, Texture+Weight, Intensity, Quality controls with debounced updates
 - Recording with `captureStream()` + `MediaRecorder` (3-10s duration enforcement)
 - Desktop (click toggle) vs Mobile (press & hold) recording mechanics
 - Real-time recording counter (100ms updates)

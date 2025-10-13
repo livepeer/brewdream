@@ -31,13 +31,13 @@ Created comprehensive helper module with:
 - **`createDaydreamStream()`**
   - Creates stream via edge function
   - Returns typed response: `{id, output_playback_id, whip_url}`
-  
+
 - **`startWhipPublish(whipUrl, mediaStream)`**
   - Full WHIP protocol implementation
   - Non-trickle ICE gathering (waits for complete state)
   - Proper offer/answer SDP exchange
   - Returns RTCPeerConnection for cleanup
-  
+
 - **`updateDaydreamPrompts(streamId, params)`**
   - Sends full StreamDiffusion params
   - Includes default controlnets with `conditioning_scale: 0`
@@ -49,7 +49,7 @@ Created comprehensive helper module with:
 - ✅ Proper WHIP publishing with camera/mic streams
 - ✅ Real-time prompt updates with StreamDiffusion params
 - ✅ Debounced prompt updates (500ms)
-- ✅ t_index_list calculation based on creativity/quality sliders
+- ✅ t_index_list calculation based on intensity/quality sliders
 
 ### 4. WebRTC Playback
 - ✅ Using iframe with `lvpr.tv/?v=${playbackId}&lowLatency=force`
@@ -153,7 +153,7 @@ Implemented full StreamDiffusion spec:
 ### StreamDiffusion Parameters
 - **t_index_list**: Calculated dynamically
   - Quality slider: determines count `[6]` → `[6,12,18,24]`
-  - Creativity slider: scales values (formula: `idx * (2.62 - 0.132 * creativity)`)
+  - Intensity slider: scales values (formula: `idx * (2.62 - 0.132 * intensity)`)
 - **controlnets**: Always included with `conditioning_scale: 0` when disabled
   - Prevents pipeline reloads
   - 5 controlnets: pose, soft_edge, canny, depth, color

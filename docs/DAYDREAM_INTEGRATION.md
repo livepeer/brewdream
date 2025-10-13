@@ -114,7 +114,7 @@ The main capture page implements:
 4. **Real-time Controls**:
    - Prompt text input
    - Texture overlays with weight control
-   - Creativity slider (affects t_index_list scaling)
+   - Intensity slider (affects t_index_list scaling)
    - Quality slider (controls number of inference steps)
 5. **Recording**: Hold-to-record (3-10s) → Creates clip via Livepeer
 
@@ -173,8 +173,8 @@ Using iframe with Livepeer's `lvpr.tv` player and forced low-latency mode:
 
 - **`t_index_list`**: Controls which diffusion steps to apply
   - Quality slider determines count: `[6]`, `[6,12]`, `[6,12,18]`, `[6,12,18,24]`
-  - Creativity slider scales indices: `idx * (2.62 - 0.132 * creativity)`
-  
+  - Intensity slider scales indices: `idx * (2.62 - 0.132 * intensity)`
+
 - **`controlnets`**: Always included with `conditioning_scale: 0` when disabled
   - Prevents pipeline reloads when toggling effects
   - Supported: pose, soft_edge, canny, depth, color

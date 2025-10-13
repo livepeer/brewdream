@@ -23,7 +23,7 @@ Mobile-first microsite for the **Realtime AI Video Summit (Open Source AI Week)*
     - **Controls (v1 minimal):**
         - **Prompt** (placeholder shows default chosen randomly for front/back based on a list you create for this context; user can overwrite).
         - **Texture** (IP-Adapter single-select, 8 options + “No texture” which is default), **Weight** slider when enabled [0..1]. Clean UI ideally same line
-        - **Creativity** [0..1] and **Quality** [0..1] → drives `t_index_list` (see mapping).
+        - **Intensity** [0..1] and **Quality** [0..1] → drives `t_index_list` (see mapping).
 5. **Capture**
     - **Hold-to-record** from **3–10s**. On release, create a **Livepeer clip** (server-side) for that duration ending “now”. Show progress → success.
 6. **Share**
@@ -69,12 +69,12 @@ Mobile-first microsite for the **Realtime AI Video Summit (Open Source AI Week)*
 - **Texture** → IP-Adapter (single):
     - Always have Ipadapters enabled in the params. You will only change the scale which should be 0 when disabled.
     - If a texture is selected, there also a 0-1 scale slider
-- **Creativity / Quality → `t_index_list` (SDXL heuristic)**
+- **Intensity / Quality → `t_index_list` (SDXL heuristic)**
     - `quality ∈ [0..1]` → **count** and **max index**:
         - low (<.25) → base `[6]`; mid (<.50) → `[6,12]`; high `(.75)`→ `[6,12,18]` ; super high →`[6,12,18,24]`
         - In between each range, increasing quality should scale the base proportionality until each index becomes the next multiple of 6. [E.g](http://E.gm). .5 should actually use [12,18] base (only >.5 becomes 3 indexes). It scales linearly from the [6,12] at ~.25
         - Defaults to 0.4
-    - `creativity ∈ [1..10]` scales indices: `scale = 2.62 - 0.132*creativity` (higher creativity → lower indices). Defaults to 5
+    - `intensity ∈ [1..10]` scales indices: `scale = 2.62 - 0.132*intensity` (higher intensity → lower indices). Defaults to 5
     - Final `t_index_list = round(base_i * scale)`, clamped `[0..50]`.
     - Rationale: higher/later indices bias refinement; earlier indices increase stylization. If any value invalid, fall back to `[4,12,20]`.
 - **Other**: keep ControlNets enabled with **conditioning_scale** (use 0 to “disable”), never flip `enabled` (avoids reload). (Matches template guidance.). Keep default set to start with, hard coded, but should be easy to change.
@@ -156,7 +156,7 @@ Routes (prefix `/functions/v1`):
 - ✅ **Login** via email OTP; (X OAuth only if trivial; otherwise skip).
 - ✅ **Camera selector** precedes permission prompt; both **camera + mic** used.
 - ✅ **Live output** is visible in a **1:1** square with source mini-preview.
-    - ✅ **Prompt**, **Texture + Weight**, **Creativity**, **Quality** controls work; params POST to Daydream promptly and don’t reload pipeline (use `conditioning_scale`=0 to “disable”).
+    - ✅ **Prompt**, **Texture + Weight**, **Intensity**, **Quality** controls work; params POST to Daydream promptly and don't reload pipeline (use `conditioning_scale`=0 to "disable").
 - ✅ **Hold-to-record** (3–10s) creates a **Livepeer asset**; clip appears in gallery within ~seconds after ready.
 - ✅ **Share to X** opens with default copy + link to the clip page.
 - ✅ **Coffee QR** displays and can be scanned; code stored in DB.

@@ -162,7 +162,7 @@ export default function Capture() {
   const [prompt, setPrompt] = useState('');
   const [selectedTexture, setSelectedTexture] = useState<string | null>(null);
   const [textureWeight, setTextureWeight] = useState([0.5]);
-  const [creativity, setCreativity] = useState([5]);
+  const [intensity, setIntensity] = useState([5]);
   const [quality, setQuality] = useState([0.4]);
   const [texturePopoverOpen, setTexturePopoverOpen] = useState(false);
 
@@ -250,8 +250,8 @@ export default function Capture() {
   const initializeStream = useCallback(async (type: 'front' | 'back', initialPrompt: string) => {
     setLoading(true);
     try {
-      // Calculate initial t_index_list based on default creativity and quality
-      const initialTIndexList = calculateTIndexList(creativity[0], quality[0]);
+      // Calculate initial t_index_list based on default intensity and quality
+      const initialTIndexList = calculateTIndexList(intensity[0], quality[0]);
 
       // Create Daydream stream with initial params to avoid default psychedelic
       console.log('[CAPTURE] Creating stream with initial prompt:', initialPrompt);
@@ -340,7 +340,7 @@ export default function Capture() {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast, creativity, quality]); // creativity and quality used in calculateTIndexList for initial params
+  }, [toast, intensity, quality]); // intensity and quality used in calculateTIndexList for initial params
 
   const selectCamera = useCallback(async (type: 'front' | 'back') => {
     setCameraType(type);
@@ -351,7 +351,7 @@ export default function Capture() {
 
     // Pass the initial prompt to initializeStream
     await initializeStream(type, randomPrompt);
-  }, [initializeStream, creativity, quality]);
+  }, [initializeStream]);
 
   // Auto-start camera on desktop (non-mobile devices)
   useEffect(() => {
@@ -572,11 +572,11 @@ export default function Capture() {
     }
 
     console.log('[CAPTURE] updatePrompt called for stream:', streamId);
-    console.log('[CAPTURE] Current state - prompt:', prompt, 'creativity:', creativity[0], 'quality:', quality[0], 'texture:', selectedTexture);
+    console.log('[CAPTURE] Current state - prompt:', prompt, 'intensity:', intensity[0], 'quality:', quality[0], 'texture:', selectedTexture);
 
     try {
-      // Calculate t_index_list based on creativity and quality
-      const tIndexList = calculateTIndexList(creativity[0], quality[0]);
+      // Calculate t_index_list based on intensity and quality
+      const tIndexList = calculateTIndexList(intensity[0], quality[0]);
       console.log('[CAPTURE] Calculated t_index_list:', tIndexList);
 
       // Determine IP-Adapter settings when a texture is selected
@@ -651,9 +651,9 @@ export default function Capture() {
     } catch (error: unknown) {
       console.error('[CAPTURE] Error updating prompt:', error);
     }
-  }, [streamId, prompt, creativity, quality, selectedTexture, textureWeight]);
+  }, [streamId, prompt, intensity, quality, selectedTexture, textureWeight]);
 
-  const calculateTIndexList = (creativityVal: number, qualityVal: number): number[] => {
+  const calculateTIndexList = (intensityVal: number, qualityVal: number): number[] => {
     let baseIndices: number[];
 
     if (qualityVal < 0.25) {
@@ -666,7 +666,7 @@ export default function Capture() {
       baseIndices = [6, 12, 18, 24];
     }
 
-    const scale = 2.62 - 0.132 * creativityVal;
+    const scale = 2.62 - 0.132 * intensityVal;
     return baseIndices.map(idx => Math.max(0, Math.min(50, Math.round(idx * scale))));
   };
 
@@ -852,7 +852,7 @@ export default function Capture() {
         prompt,
         textureId: selectedTexture,
         textureWeight: selectedTexture ? textureWeight[0] : null,
-        tIndexList: calculateTIndexList(creativity[0], quality[0]),
+        tIndexList: calculateTIndexList(intensity[0], quality[0]),
       });
 
       toast({
@@ -922,7 +922,7 @@ export default function Capture() {
   useEffect(() => {
     if (streamId && streamInitialized && prompt) {
       console.log('[CAPTURE] Stream just initialized - forcing parameter sync with current UI state');
-      console.log('[CAPTURE] Syncing: prompt=', prompt, 'creativity=', creativity[0], 'quality=', quality[0]);
+      console.log('[CAPTURE] Syncing: prompt=', prompt, 'intensity=', intensity[0], 'quality=', quality[0]);
       updatePrompt();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -939,7 +939,7 @@ export default function Capture() {
       return () => clearTimeout(debounce);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prompt, selectedTexture, textureWeight, creativity, quality, streamId, streamInitialized]);
+  }, [prompt, selectedTexture, textureWeight, intensity, quality, streamId, streamInitialized]);
 
   // Update recording timer display
   useEffect(() => {
@@ -1412,11 +1412,11 @@ export default function Capture() {
 
             <div>
               <label className="text-sm font-medium mb-2 block text-neutral-300">
-                Creativity: {creativity[0].toFixed(1)}
+                Intensity: {intensity[0].toFixed(1)}
               </label>
               <Slider
-                value={creativity}
-                onValueChange={setCreativity}
+                value={intensity}
+                onValueChange={setIntensity}
                 min={1}
                 max={10}
                 step={0.1}
