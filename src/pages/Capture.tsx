@@ -813,12 +813,12 @@ export default function Capture() {
         filename,
         (progress) => {
           if (progress.phase === 'processing' && progress.progress !== undefined) {
-            // Convert progress to percentage (0-100)
-            const apiProgressPercent = Math.round(progress.progress * 100);
 
             // Smooth progression: use API value if greater, otherwise increment by 1%
             setLastDisplayedProgress(prev => {
-              const newProgress = apiProgressPercent > prev ? apiProgressPercent : Math.min(prev + 1, 100);
+              let newProgress = Math.round(progress.progress);
+              newProgress = newProgress > prev ? newProgress : prev + 1;
+              newProgress = Math.min(99, newProgress); // Cap at 99% while processing
               setUploadProgress(`Processing: ${newProgress}%`);
               return newProgress;
             });
