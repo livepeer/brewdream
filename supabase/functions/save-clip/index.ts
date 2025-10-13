@@ -8,7 +8,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -22,16 +22,16 @@ serve(async (req) => {
       }
     );
 
-    const { 
-      assetId, 
-      playbackId, 
-      durationMs, 
+    const {
+      assetId,
+      playbackId,
+      durationMs,
       downloadUrl,
-      prompt, 
-      texture_id, 
-      texture_weight, 
+      prompt,
+      texture_id,
+      texture_weight,
       t_index_list,
-      session_id 
+      session_id
     } = await req.json();
 
     if (!assetId || !playbackId || !session_id) {
@@ -71,8 +71,8 @@ serve(async (req) => {
     });
   } catch (error: any) {
     console.error('Error in save-clip function:', error);
-    return new Response(JSON.stringify({ 
-      error: error.message 
+    return new Response(JSON.stringify({
+      error: error.message
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

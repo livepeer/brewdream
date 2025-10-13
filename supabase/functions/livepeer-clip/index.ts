@@ -7,7 +7,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -42,7 +42,7 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Livepeer API error:', response.status, errorText);
-      
+
       // If timestamp-based clipping fails, try fallback approach
       console.log('Attempting fallback clip creation...');
       const fallbackResponse = await fetch('https://livepeer.studio/api/clip', {
@@ -77,7 +77,7 @@ serve(async (req) => {
     if (data.asset?.id) {
       let attempts = 0;
       const maxAttempts = 30;
-      
+
       while (attempts < maxAttempts) {
         const assetResponse = await fetch(`https://livepeer.studio/api/asset/${data.asset.id}`, {
           headers: {
@@ -116,7 +116,7 @@ serve(async (req) => {
     });
   } catch (error: any) {
     console.error('Error in livepeer-clip function:', error);
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: error.message,
       hint: 'Clip creation may be unavailable for WebRTC streams. Try again or check Livepeer dashboard.'
     }), {

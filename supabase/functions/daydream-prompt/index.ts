@@ -7,7 +7,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   console.log('[EDGE] daydream-prompt function called (version: 2025-10-12-correct-api-endpoint)');
@@ -43,10 +43,10 @@ serve(async (req) => {
     if (!response.ok) {
       console.error('[EDGE] Daydream API error:', JSON.stringify(data, null, 2));
       // Pass through the full Daydream error response to frontend
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         error: 'Daydream API Error',
         daydreamError: data,
-        status: response.status 
+        status: response.status
       }), {
         status: 400, // Use 400 instead of passing through 404, so frontend sees it as error not "not found"
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
