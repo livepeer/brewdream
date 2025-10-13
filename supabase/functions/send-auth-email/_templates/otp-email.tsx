@@ -35,7 +35,7 @@ export const OtpEmail = ({
           Click the button below to sign in to your account:
         </Text>
         <Link
-          href={`${supabase_url}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${redirect_to}`}
+          href={`${supabase_url}/auth/v1/verify?token=${token}&type=${email_action_type}&redirect_to=${redirect_to}`}
           target="_blank"
           style={button}
         >

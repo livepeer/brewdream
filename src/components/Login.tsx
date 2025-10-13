@@ -98,6 +98,7 @@ export function Login() {
       // If there's an error and it's not a duplicate, throw it
       if (insertError && !insertError.message.includes('duplicate')) {
         console.error('Failed to create user record:', insertError);
+        // Don't throw here, just log the error and continue
       }
 
       // If user is anonymous, link their account
@@ -146,9 +147,12 @@ export function Login() {
             email_verified: true
           }, { onConflict: 'id' });
 
+        // Check if this was an anonymous user upgrading their account
+        const wasAnonymous = session.user.is_anonymous || false;
+        
         toast({
           title: 'Success!',
-          description: isAnonymous ? 'Email added to your account' : 'Logged in successfully',
+          description: wasAnonymous ? 'Email added to your account' : 'Logged in successfully',
         });
 
         navigate('/capture');
@@ -156,7 +160,7 @@ export function Login() {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, toast, isAnonymous]);
+  }, [navigate, toast]);
 
   return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-background">
