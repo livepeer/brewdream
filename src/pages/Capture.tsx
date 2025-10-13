@@ -173,6 +173,7 @@ export default function Capture() {
   const [showSlowLoadingMessage, setShowSlowLoadingMessage] = useState(false);
   const [uploadingClip, setUploadingClip] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
+  const [lastDisplayedProgress, setLastDisplayedProgress] = useState<number>(0);
   const [micEnabled, setMicEnabled] = useState(false);
   const [micPermissionGranted, setMicPermissionGranted] = useState(false);
   const [micPermissionDenied, setMicPermissionDenied] = useState(false);
@@ -312,23 +313,46 @@ export default function Capture() {
 
       // Save session to database
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // For anonymous users, look up by ID instead of email
-        const query = user.is_anonymous
-          ? supabase.from('users').select('id').eq('id', user.id)
-          : supabase.from('users').select('id').eq('email', user.email);
-
-        const { data: userData } = await query.single();
-
-        if (userData) {
-          await supabase.from('sessions').insert({
-            user_id: userData.id,
-            stream_id: streamData.id,
-            playback_id: streamData.output_playback_id,
-            camera_type: type,
-          });
-        }
+      if (!user) {
+        console.error('[CAPTURE] No authenticated user found');
+        await supabase.auth.signOut();
+        navigate('/login');
+        return;
       }
+
+      // Check if user exists in database
+      const { data: userData, error: userLookupError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      if (userLookupError || !userData) {
+        console.error('[CAPTURE] User not found in database, clearing auth:', userLookupError);
+        await supabase.auth.signOut();
+        navigate('/login');
+        return;
+      }
+
+      console.log('[CAPTURE] Creating session:', {
+        user_id: userData.id,
+        stream_id: streamData.id,
+        playback_id: streamData.output_playback_id
+      });
+
+      const { error: sessionError } = await supabase.from('sessions').insert({
+        user_id: userData.id,
+        stream_id: streamData.id,
+        playback_id: streamData.output_playback_id,
+        camera_type: type,
+      });
+
+      if (sessionError) {
+        console.error('[CAPTURE] Error creating session:', sessionError);
+        throw new Error(`Failed to create session: ${sessionError.message}`);
+      }
+
+      console.log('[CAPTURE] Session created successfully');
     } catch (error: unknown) {
       console.error('Error initializing stream:', error);
       toast({
@@ -748,7 +772,7 @@ export default function Capture() {
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    
+
     // Clean up
     setTimeout(() => {
       document.body.removeChild(a);
@@ -795,6 +819,7 @@ export default function Capture() {
     setRecording(false);
     recordStartTimeRef.current = null;
     setUploadingClip(true);
+    setLastDisplayedProgress(0); // Reset progress tracking
 
     try {
       // Stop the recorder and get the blob
@@ -825,29 +850,50 @@ export default function Capture() {
         blob,
         filename,
         (progress) => {
-          setUploadProgress(progress.step || progress.phase);
+          if (progress.phase === 'processing' && progress.progress !== undefined) {
+            // Convert progress to percentage (0-100)
+            const apiProgressPercent = Math.round(progress.progress * 100);
+
+            // Smooth progression: use API value if greater, otherwise increment by 1%
+            setLastDisplayedProgress(prev => {
+              const newProgress = apiProgressPercent > prev ? apiProgressPercent : Math.min(prev + 1, 100);
+              setUploadProgress(`Processing: ${newProgress}%`);
+              return newProgress;
+            });
+          } else {
+            setUploadProgress(progress.step || progress.phase);
+          }
         }
       );
 
       console.log('Upload complete, saving to database...');
 
       // Get session ID
-      const { data: sessionData } = await supabase
+      const { data: sessionData, error: sessionError } = await supabase
         .from('sessions')
         .select('id')
         .eq('stream_id', streamId)
         .single();
 
+      if (sessionError) {
+        console.error('Session query error:', sessionError, { streamId });
+        throw new Error(`Session not found: ${sessionError.message}`);
+      }
+
       if (!sessionData) {
         throw new Error('Session not found');
       }
 
-      // Save to database
+      // Save to database (clamp duration to valid range: 3-10s)
+      const clampedDuration = Math.min(Math.max(durationMs, 3000), 10000);
+      if (clampedDuration !== durationMs) {
+        console.log(`Duration clamped: ${durationMs}ms -> ${clampedDuration}ms`);
+      }
       const clip = await saveClipToDatabase({
         assetId,
         playbackId: assetPlaybackId,
         downloadUrl,
-        durationMs,
+        durationMs: clampedDuration,
         sessionId: sessionData.id,
         prompt,
         textureId: selectedTexture,
@@ -871,6 +917,7 @@ export default function Capture() {
     } finally {
       setUploadingClip(false);
       setUploadProgress('');
+      setLastDisplayedProgress(0);
     }
   };
 

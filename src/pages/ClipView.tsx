@@ -47,9 +47,9 @@ export default function ClipView() {
   const [isRedeeming, setIsRedeeming] = useState(false);
   const { toast } = useToast();
   const coffeeCardRef = useRef<HTMLDivElement | null>(null);
-  const swipeY = useMotionValue(0);
-  const opacity = useTransform(swipeY, [0, 150], [1, 0]);
-  const scale = useTransform(swipeY, [0, 150], [1, 0.9]);
+  const swipeX = useMotionValue(0);
+  const opacity = useTransform(swipeX, [-150, 0, 150], [0, 1, 0]);
+  const scale = useTransform(swipeX, [-150, 0, 150], [0.9, 1, 0.9]);
 
   useEffect(() => {
     loadClip();
@@ -209,16 +209,17 @@ export default function ClipView() {
     const dragThreshold = 100; // pixels
 
     if (isSwipeLocked || isRedeemed || isRedeeming) {
-      swipeY.set(0);
+      swipeX.set(0);
       return;
     }
 
-    if (info.offset.y > dragThreshold) {
+    // Check if swiped left or right past threshold
+    if (Math.abs(info.offset.x) > dragThreshold) {
       // Swipe successful - redeem ticket
       await redeemTicket();
     } else {
       // Snap back
-      swipeY.set(0);
+      swipeX.set(0);
     }
   };
 
@@ -233,12 +234,12 @@ export default function ClipView() {
 
       if (error) throw error;
 
-      // Animate ticket away
-      swipeY.set(200);
+      // Animate ticket away (swipe off to the side)
+      swipeX.set(swipeX.get() > 0 ? 300 : -300);
 
       setTimeout(() => {
         setIsRedeemed(true);
-        swipeY.set(0);
+        swipeX.set(0);
 
         toast({
           title: 'Ticket redeemed!',
@@ -248,7 +249,7 @@ export default function ClipView() {
 
     } catch (error: any) {
       console.error('Error redeeming ticket:', error);
-      swipeY.set(0);
+      swipeX.set(0);
 
       toast({
         title: 'Error',
@@ -282,13 +283,15 @@ export default function ClipView() {
     );
   }
 
+  console.log('clip.asset_playback_id', clip?.asset_playback_id);
+
   return (
     <div className="min-h-screen">
       <Header isAuthenticated={isAuthenticated} />
 
       <div className="container mx-auto px-6 py-8">
         {/* Back Button */}
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="mb-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
@@ -305,16 +308,13 @@ export default function ClipView() {
               transition={{ duration: 0.4 }}
             >
               <div className="relative aspect-[9/16] max-h-[80vh] w-full bg-black">
-                <video
-                  src={`https://lvpr.tv/?v=${clip.asset_playback_id}`}
-                  poster={`https://lvpr.tv/?v=${clip.asset_playback_id}`}
-                  controls
-                  className="h-full w-full object-contain"
-                  autoPlay
-                  loop
-                >
-                  Your browser does not support the video tag.
-                </video>
+                <iframe
+                  src={`https://lvpr.tv/?v=${clip.asset_playback_id}&autoplay=1&loop=1`}
+                  className="w-full h-full border-0"
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowFullScreen
+                  title="Clip playback"
+                />
               </div>
             </motion.div>
 
@@ -385,11 +385,11 @@ export default function ClipView() {
                   {/* Swipeable Ticket Card */}
                   <motion.div
                     ref={coffeeCardRef}
-                    drag="y"
-                    dragConstraints={{ top: 0, bottom: 0 }}
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 0 }}
                     dragElastic={0.2}
                     onDragEnd={handleDragEnd}
-                    style={{ y: swipeY, opacity, scale }}
+                    style={{ x: swipeX, opacity, scale }}
                     className="bg-card rounded-2xl p-6 border border-border relative overflow-hidden cursor-grab active:cursor-grabbing"
                   >
                     {/* Lock indicator */}
@@ -407,13 +407,14 @@ export default function ClipView() {
                         {ticketCode}
                       </div>
                       <p className="text-sm text-muted-foreground mb-3">
-                        {isSwipeLocked ? 'Getting ready...' : 'Swipe down to redeem'}
+                        {isSwipeLocked ? 'Getting ready...' : 'Swipe left or right to redeem'}
                       </p>
 
                       {/* Visual indicator for swipe */}
                       {!isSwipeLocked && (
-                        <div className="flex justify-center animate-bounce">
-                          <div className="w-8 h-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full" />
+                        <div className="flex justify-center gap-1 items-center">
+                          <div className="w-8 h-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-pulse" />
+                          <span className="text-xs text-muted-foreground">←  →</span>
                         </div>
                       )}
                     </div>
@@ -497,7 +498,7 @@ export default function ClipView() {
                 <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-sm font-bold text-primary">2</span>
                 </div>
-                <p>The bartender will swipe down on your phone to validate your ticket</p>
+                <p>The bartender will swipe left or right on your phone to validate your ticket</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
