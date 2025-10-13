@@ -9,7 +9,9 @@ import { Mail } from 'lucide-react';
 
 export function Login() {
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
+  // Separate loading flags so one action doesn't lock the whole form
+  const [anonLoading, setAnonLoading] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const navigate = useNavigate();
@@ -35,47 +37,31 @@ export function Login() {
   }, [navigate]);
 
   const handleAnonymousLogin = async () => {
-    setLoading(true);
+    setAnonLoading(true);
     try {
       const { data, error } = await supabase.auth.signInAnonymously();
-
       if (error) throw error;
 
-      // Store anonymous user in users table (no email)
+      // Ensure the app-level user row exists BEFORE redirecting
       if (data.user) {
         const { error: insertError } = await supabase
           .from('users')
-          .upsert({
-            id: data.user.id,
-            email: null
-          }, { onConflict: 'id' });
-
-        if (insertError) {
-          console.error('Failed to create user record:', insertError);
-          throw new Error(`Failed to create user record: ${insertError.message}`);
-        }
+          .upsert({ id: data.user.id, email: null }, { onConflict: 'id' });
+        if (insertError) throw insertError;
       }
 
-      toast({
-        title: 'Welcome!',
-        description: 'You can start creating clips right away',
-      });
-
+      toast({ title: 'Welcome!', description: 'You can start creating clips right away' });
       navigate('/capture');
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
-      setLoading(false);
+      setAnonLoading(false);
     }
   };
 
   const handleSendMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setEmailLoading(true);
 
     try {
       // Get current session to check if user is anonymous
@@ -101,7 +87,7 @@ export function Login() {
         // Don't throw here, just log the error and continue
       }
 
-      // If user is anonymous, link their account
+      // If user is anonymous, link their account BEFORE sending the email
       if (isAnonymous && currentUserId) {
         const { error: updateError } = await supabase.auth.updateUser({ email });
         if (updateError) throw updateError;
@@ -123,13 +109,9 @@ export function Login() {
         description: 'Click the link in your email to sign in',
       });
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
-      setLoading(false);
+      setEmailLoading(false);
     }
   };
 
@@ -137,18 +119,18 @@ export function Login() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        // User successfully authenticated via magic link
-        // Update their user record to mark email as verified
-        await supabase
-          .from('users')
-          .upsert({
-            id: session.user.id,
-            email: session.user.email,
-            email_verified: true
-          }, { onConflict: 'id' });
-
-        // Check if this was an anonymous user upgrading their account
         const wasAnonymous = session.user.is_anonymous || false;
+
+        // Only mark email as verified for non-anonymous sessions
+        if (!wasAnonymous) {
+          await supabase
+            .from('users')
+            .upsert({
+              id: session.user.id,
+              email: session.user.email,
+              email_verified: true
+            }, { onConflict: 'id' });
+        }
         
         toast({
           title: 'Success!',
@@ -194,10 +176,10 @@ export function Login() {
                 <>
                   <Button
                     onClick={handleAnonymousLogin}
-                    disabled={loading}
+                    disabled={anonLoading || emailLoading}
                     className="w-full h-14 bg-neutral-100 text-neutral-900 mt-8 hover:bg-neutral-200 border border-border transition-colors"
                   >
-                    {loading ? 'Loading...' : 'Continue without email'}
+                    {anonLoading ? 'Loading...' : 'Continue without email'}
                   </Button>
 
                   <div className="relative">
@@ -222,14 +204,14 @@ export function Login() {
                 />
                 <Button
                   type="submit"
-                  disabled={loading}
+                  disabled={emailLoading || anonLoading}
                   className={`w-full h-12 ${
                     isAnonymous
                       ? 'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 border border-border'
                       : 'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 border border-border'
                   }`}
                 >
-                  {loading
+                  {emailLoading
                     ? 'Sending...'
                     : isAnonymous
                     ? 'Add email & get coffee ticket'
@@ -240,7 +222,7 @@ export function Login() {
               {isAnonymous && (
                 <Button
                   onClick={() => navigate('/capture')}
-                  disabled={loading}
+                  disabled={anonLoading || emailLoading}
                   variant="outline"
                   className="w-full h-12 border-border text-muted-foreground hover:text-foreground transition-colors"
                 >
