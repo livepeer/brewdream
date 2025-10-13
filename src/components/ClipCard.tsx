@@ -11,7 +11,7 @@ interface Clip {
   prompt: string;
   created_at: string;
   duration_ms: number;
-  likes_count: number;
+  likes_count?: number;
 }
 
 interface ClipCardProps {

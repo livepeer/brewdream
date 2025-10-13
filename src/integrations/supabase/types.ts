@@ -50,7 +50,6 @@ export type Database = {
           created_at: string | null
           duration_ms: number
           id: string
-          likes_count: number
           prompt: string
           session_id: string
           t_index_list: number[] | null
@@ -63,7 +62,6 @@ export type Database = {
           created_at?: string | null
           duration_ms: number
           id?: string
-          likes_count?: number
           prompt: string
           session_id: string
           t_index_list?: number[] | null
@@ -76,7 +74,6 @@ export type Database = {
           created_at?: string | null
           duration_ms?: number
           id?: string
-          likes_count?: number
           prompt?: string
           session_id?: string
           t_index_list?: number[] | null

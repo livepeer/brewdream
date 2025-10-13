@@ -24,7 +24,9 @@ interface Clip {
   duration_ms: number;
   created_at: string;
   session_id: string;
-  likes_count: number;
+  likes_count?: {
+    count: number;
+  }[];
 }
 
 interface Ticket {
@@ -108,13 +110,19 @@ export default function ClipView() {
     try {
       const { data, error } = await supabase
         .from('clips')
-        .select('*')
+        .select(`
+          *,
+          likes_count:clip_likes(count)
+        `)
         .eq('id', id)
         .single();
 
       if (error) throw error;
       setClip(data);
-      setLikesCount(data.likes_count || 0);
+
+      // Extract likes count from the aggregated result
+      const count = data.likes_count?.[0]?.count || 0;
+      setLikesCount(count);
 
       // Check if user owns this clip and if they have a ticket
       const { data: { user } } = await supabase.auth.getUser();
@@ -217,7 +225,7 @@ export default function ClipView() {
     } catch (error) {
       // Revert optimistic update on error
       setIsLiked(!isLiked);
-      setLikesCount(clip.likes_count);
+      setLikesCount(clip.likes_count?.[0]?.count || 0);
 
       console.error('Error toggling like:', error);
       toast({

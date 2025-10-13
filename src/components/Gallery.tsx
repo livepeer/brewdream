@@ -12,7 +12,7 @@ interface Clip {
   prompt: string;
   created_at: string;
   duration_ms: number;
-  likes_count: number;
+  likes_count?: number;
 }
 
 export function Gallery() {
@@ -30,6 +30,7 @@ export function Gallery() {
   useEffect(() => {
     loadClips();
     checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -49,19 +50,26 @@ export function Gallery() {
     }
 
     return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMore, loading, loadingMore, page]);
 
   const loadClips = async () => {
     try {
       const { data, error } = await supabase
         .from('clips')
-        .select('*')
+        .select(`
+          *,
+          likes_count:clip_likes(count)
+        `)
         .order('created_at', { ascending: false })
         .range(0, PAGE_SIZE - 1);
 
       if (error) throw error;
 
-      const fetchedClips = data || [];
+      const fetchedClips = (data || []).map(clip => ({
+        ...clip,
+        likes_count: clip.likes_count?.[0]?.count || 0
+      }));
       setClips(fetchedClips);
       setHasMore(fetchedClips.length === PAGE_SIZE);
       setPage(1);
@@ -82,13 +90,19 @@ export function Gallery() {
 
       const { data, error } = await supabase
         .from('clips')
-        .select('*')
+        .select(`
+          *,
+          likes_count:clip_likes(count)
+        `)
         .order('created_at', { ascending: false })
         .range(startRange, endRange);
 
       if (error) throw error;
 
-      const fetchedClips = data || [];
+      const fetchedClips = (data || []).map(clip => ({
+        ...clip,
+        likes_count: clip.likes_count?.[0]?.count || 0
+      }));
 
       if (fetchedClips.length < PAGE_SIZE) {
         setHasMore(false);
