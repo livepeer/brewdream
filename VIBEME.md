@@ -39,6 +39,8 @@
 3. Update VIBEME only for architectural changes, not implementation details
 4. Add new detailed docs to `docs/` folder, not here
 
+**⚠️ CRITICAL FOR AI AGENTS**: When you complete significant changes (new features, architectural modifications, workflow updates), you MUST update VIBEME.md to reflect those changes. This file is the primary context source for future agents. If you've read VIBEME at the start of a task, you are responsible for updating it at the end. Don't leave it for the next agent!
+
 ### Quick Navigation Guide
 
 | **Looking for...** | **Go to...** |
@@ -161,6 +163,7 @@ These are **non-negotiable** technical requirements:
 3. **AI Processing** → Daydream applies effects in real-time
 4. **Playback** → Livepeer Player shows output (WebRTC-only, low-latency)
 5. **Recording** → Capture rendered video, upload to Livepeer, save to DB
+6. **Gallery Display** → Direct MP4 playback using VOD CDN URL pattern
 
 **Key Implementation Files**:
 - `src/lib/daydream.ts` - Stream creation, WHIP, prompt updates
@@ -177,6 +180,7 @@ These are **non-negotiable** technical requirements:
 - Daydream playback IDs need manual src construction (not `getSrc()`)
 - Front camera mirroring at source (canvas `scaleX(-1)`) before WHIP
 - WebRTC-only playback (`lowLatency=force`)
+- Gallery uses direct MP4 URLs: `https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls/{playback_id}/static512p0.mp4`
 
 **Detailed Guides**:
 - [`docs/DAYDREAM_INTEGRATION.md`](./docs/DAYDREAM_INTEGRATION.md) - WHIP, WebRTC, playback setup
@@ -300,6 +304,21 @@ Two modes: **Anonymous** (instant access) + **Email OTP** (for coffee tickets)
   - **Locked**: First 5 seconds, shows spinner, swipe disabled
   - **Redeemed**: Checkmark icon, grayed out, "Create New Clip" button
 - **Tech**: Framer Motion drag API, useMotionValue/useTransform for animations
+
+### Gallery & Home Page (Gallery.tsx + ClipCard.tsx)
+- **Pagination**: 10 clips/page on mobile, 16 on desktop (responsive via `useIsMobile()`)
+- **Infinite Scroll**: IntersectionObserver triggers load when sentinel element is visible
+- **Ordering**: Latest first (`created_at DESC`)
+- **Video Display**: Direct MP4 URLs using VOD CDN pattern, looped on hover
+- **Responsive Aspect Ratios**:
+  - Mobile (<768px): 9:16 portrait (fills screen when scrolled)
+  - Desktop (≥768px): 1:1 square (original recording format)
+  - Both use `object-cover` to crop without black bars
+- **Stats**:
+  - Likes: Displayed directly from `clips.likes_count` column
+  - Views: Lazy-loaded via IntersectionObserver when card enters viewport
+  - Calls `get-viewership` edge function with `asset_playback_id`
+- **Performance**: View counts fetched only once per card, cached in component state
 
 ## 🎨 Styling Philosophy
 
@@ -782,7 +801,9 @@ Avoid:
 - Clip metadata saved to database with all AI parameters
 - Share to X with default copy
 - Coffee QR display and DB storage
-- Gallery home with square grid
+- Gallery home with paginated clip loading, infinite scroll, and responsive layout
+- Real stats display: likes from DB, views via lazy-loaded API calls
+- Direct MP4 video playback with hover interactions
 
 **Partially implemented (⚠️):**
 - Texture system: 8 slots defined, but actual texture images are placeholders
@@ -805,15 +826,23 @@ Avoid:
 - **Camera mirroring**: Canvas-based stream manipulation before Daydream instead of CSS transforms
   - **Rationale**: Ensures Daydream processes mirrored input, output is naturally mirrored, UI elements remain readable
   - **Benefit**: More robust, no CSS transform issues, consistent across browsers
-- **Gallery**: Shows video player instead of thumbnails (simpler, works for POC)
+- **Gallery**: Uses direct MP4 playback URLs instead of iframes or traditional thumbnails
+  - **Rationale**: Enables seamless looping, lower latency, better mobile performance
+  - **URL Pattern**: `https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls/{playback_id}/static512p0.mp4`
+  - **Pagination**: 10 clips/page mobile, 16 desktop with infinite scroll
+  - **Responsive**: 1:1 square on desktop, 9:16 portrait on mobile
 - **No X OAuth**: Per PRD optional clause ("optional if trivial; otherwise require email")
 - **Ticket route**: Simplified (QR shown on clip page only)
 
 ---
 
-**Last Updated**: 2025-10-12
+**Last Updated**: 2025-10-13
 
 **Recent Changes**:
+- **Home page gallery implementation**: Added pagination (10 mobile/16 desktop), infinite scroll, real stats
+- **Direct MP4 playback**: Gallery now uses VOD CDN URLs for seamless looping and better performance
+- **Responsive video display**: 1:1 squares on desktop, 9:16 portrait on mobile
+- **Lazy stats loading**: View counts fetched via IntersectionObserver only when cards are visible
 - **Documentation restructure**: Moved detailed implementation docs to `docs/` folder
 - **VIBEME refactor**: Now focuses on high-level architecture and quirks, points to `docs/` for details
 - All critical fixes documented in "Known Issues & Workarounds" section

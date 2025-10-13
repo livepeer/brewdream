@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Eye, Heart, Play } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface Clip {
   id: string;
@@ -9,6 +11,7 @@ interface Clip {
   prompt: string;
   created_at: string;
   duration_ms: number;
+  likes_count: number;
 }
 
 interface ClipCardProps {
@@ -16,32 +19,59 @@ interface ClipCardProps {
 }
 
 export function ClipCard({ clip }: ClipCardProps) {
-  const [imageError, setImageError] = useState(false);
+  const [viewCount, setViewCount] = useState<number | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const hasLoadedViews = useRef(false);
+  const isMobile = useIsMobile();
+
   const duration = clip.duration_ms / 1000;
   const minutes = Math.floor(duration / 60);
   const seconds = Math.floor(duration % 60);
 
-  // Placeholder video URLs to cycle through when image fails
-  const placeholderVideos = [
-    'https://cdn.prod.website-files.com/6882746ed4d70bc6cf8b898b%2F68d46b391a14d2b9d7bb8f17_clean_output%20%281%29-transcode.mp4',
-    'https://cdn.prod.website-files.com/6882746ed4d70bc6cf8b898b%2F68d543ab54b9553253cae922_Feedback1-transcode.mp4',
-    'https://cdn.prod.website-files.com/6882746ed4d70bc6cf8b898b%2F68d562b83269d4d9fabdc28c_SD-Webcam-2a-transcode.mp4',
-    'https://cdn.prod.website-files.com/6882746ed4d70bc6cf8b898b%2F68d412f81128450e5615d225_Jellyfish%20-%201x1%20%281%29-transcode.mp4'
-  ];
+  // Build direct MP4 URL
+  const videoUrl = `https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls/${clip.asset_playback_id}/static512p0.mp4`;
 
-// Simple deterministic hash → number between 0 and placeholderVideos.length - 1
-const hashToIndex = (str: string, length: number) => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash * 31 + str.charCodeAt(i)) % length;
-  }
-  return hash;
-};
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !hasLoadedViews.current) {
+          hasLoadedViews.current = true;
+          fetchViewCount();
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
 
-const placeholderVideoIndex = hashToIndex(clip.id, placeholderVideos.length);
-const fallbackVideo = placeholderVideos[placeholderVideoIndex];
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
+    }
+
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchViewCount = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('get-viewership', {
+        body: { playbackId: clip.asset_playback_id }
+      });
+
+      if (error) {
+        console.error('Error fetching view count:', error);
+        setViewCount(0);
+        return;
+      }
+
+      setViewCount(data?.viewCount || 0);
+    } catch (error) {
+      console.error('Error fetching view count:', error);
+      setViewCount(0);
+    }
+  };
   return (
     <motion.div
+      ref={cardRef}
       layoutId={`clip-${clip.id}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -49,26 +79,16 @@ const fallbackVideo = placeholderVideos[placeholderVideoIndex];
       className="group relative overflow-hidden rounded-2xl bg-card hover:shadow-lg hover:shadow-[0_0_15px_2px_theme(colors.neutral.700/0.4)] transition-all duration-300 hover:border-neutral-800 border border-neutral-900"
     >
       <Link to={`/clip/${clip.id}`} className="block">
-        {/* Poster Image/Video */}
-        <div className="relative aspect-[9/16] overflow-hidden">
-          {!imageError ? (
-            <img
-              src={`https://lvpr.tv/?v=${clip.asset_playback_id}`}
-              alt={clip.prompt}
-              onError={() => setImageError(true)}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
-            />
-          ) : (
-            <video
-              src={fallbackVideo}
-              autoPlay
-              loop
-              muted
-              playsInline
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-          )}
+        {/* Video */}
+        <div className={`relative overflow-hidden ${isMobile ? 'aspect-[9/16]' : 'aspect-square'}`}>
+          <video
+            src={videoUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
 
           {/* Overlay on hover */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100">
@@ -93,11 +113,11 @@ const fallbackVideo = placeholderVideos[placeholderVideoIndex];
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-1">
               <Eye className="h-3.5 w-3.5" />
-              <span>0</span>
+              <span>{viewCount !== null ? viewCount : '...'}</span>
             </div>
             <div className="flex items-center gap-1">
               <Heart className="h-3.5 w-3.5" />
-              <span>0</span>
+              <span>{clip.likes_count}</span>
             </div>
           </div>
         </div>
