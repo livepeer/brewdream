@@ -451,7 +451,7 @@ export default function ClipView() {
             {/* Video Player */}
             <motion.div
               layoutId={`clip-${clip.id}`}
-              className="relative mb-4 md:mb-6 overflow-hidden rounded-2xl bg-card border border-neutral-800 shadow-lg shadow-[0_0_15px_2px_theme(colors.neutral.800/0.4)] aspect-square w-full max-w-[600px] max-h-[60vh] mx-auto"
+              className="relative mb-4 md:mb-6 overflow-hidden rounded-2xl bg-black border border-neutral-800 shadow-lg shadow-[0_0_15px_2px_theme(colors.neutral.800/0.4)] aspect-square w-full max-w-[600px] lg:max-h-[60vh] mx-auto"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4 }}
@@ -462,7 +462,7 @@ export default function ClipView() {
                 loop
                 muted
                 playsInline
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
             </motion.div>
 
