@@ -445,27 +445,25 @@ export default function ClipView() {
       />
 
       <div className="container mx-auto px-6 py-8">
-        <div className="grid gap-8 lg:grid-cols-3">
+        <div className="grid gap-4 lg:gap-8 lg:grid-cols-3">
           {/* Main Content */}
           <div className="lg:col-span-2">
             {/* Video Player */}
             <motion.div
               layoutId={`clip-${clip.id}`}
-              className="relative mb-6 overflow-hidden rounded-2xl bg-card border border-neutral-800 shadow-lg shadow-[0_0_15px_2px_theme(colors.neutral.800/0.4)]"
+              className="relative mb-4 md:mb-6 overflow-hidden rounded-2xl bg-card border border-neutral-800 shadow-lg shadow-[0_0_15px_2px_theme(colors.neutral.800/0.4)] aspect-square w-full max-w-[600px] max-h-[60vh] mx-auto"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4 }}
             >
-              <div className="relative aspect-[9/16] max-h-[80vh] w-full bg-black">
-                <video
-                  src={`https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls/${clip.asset_playback_id}/static512p0.mp4`}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-full object-contain"
-                />
-              </div>
+              <video
+                src={`https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls/${clip.asset_playback_id}/static512p0.mp4`}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="w-full h-full object-cover"
+              />
             </motion.div>
 
 
