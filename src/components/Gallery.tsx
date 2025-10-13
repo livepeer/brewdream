@@ -187,12 +187,12 @@ export function Gallery() {
             </p>
           </div>
 
-          {/* Masonry Grid */}
-          <div className="columns-1 gap-6 sm:columns-2 lg:columns-3 xl:columns-4 relative z-10">
+          {/* Grid */}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 relative z-10">
             <div className="pointer-events-none absolute inset-y-0 right-0 w-screen top-0 bg-gradient-to-t from-neutral-950 h-screen via-neutral-900 to-transparent opacity-30 blur-3xl" />
 
             {clips.map((clip) => (
-              <div key={clip.id} className="mb-6 break-inside-avoid">
+              <div key={clip.id}>
                 <ClipCard clip={clip} />
               </div>
             ))}
