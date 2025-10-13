@@ -515,115 +515,136 @@ export default function ClipView() {
                 <Download className="h-5 w-5" />
               </Button>
             </motion.div>
-            {/* Coffee Ticket Section - Only visible to clip owner */}
-            {isOwner && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4, duration: 0.4 }}
-              >
-                {ticketCode && !isRedeemed ? (
+            {/* Coffee Ticket Section */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.4 }}
+            >
+              {isOwner ? (
+                // Owner's ticket states
                 <>
-                  {/* Always-visible instructions */}
-                  <div className="mb-3 text-center">
-                    <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
-                      <AlertCircle className="w-4 h-4" />
-                      Show this ticket to the bartender to claim your coffee
-                    </p>
-                  </div>
-
-                  {/* Swipeable Ticket Card */}
-                  <motion.div
-                    ref={coffeeCardRef}
-                    drag="x"
-                    dragConstraints={{ left: 0, right: 0 }}
-                    dragElastic={0.2}
-                    onDragEnd={handleDragEnd}
-                    style={{ x: swipeX, opacity, scale }}
-                    className="bg-card rounded-2xl p-6 border border-border relative overflow-hidden cursor-grab active:cursor-grabbing"
-                  >
-                    {/* Lock indicator */}
-                    {isSwipeLocked && (
-                      <div className="absolute top-2 right-2 text-xs text-muted-foreground flex items-center gap-1 bg-background/80 px-2 py-1 rounded-full">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Please wait...
+                  {ticketCode && !isRedeemed ? (
+                    <>
+                      {/* Always-visible instructions */}
+                      <div className="mb-3 text-center">
+                        <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+                          <AlertCircle className="w-4 h-4" />
+                          Show this ticket to the bartender to claim your coffee
+                        </p>
                       </div>
-                    )}
 
-                    <div className="text-center">
-                      <Coffee className="w-12 h-12 mx-auto mb-4 text-primary" />
-                      <h3 className="text-lg font-bold mb-2">Your Coffee Ticket</h3>
-                      <div className="text-4xl font-mono font-bold tracking-wider bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 bg-clip-text text-transparent mb-2">
-                        {ticketCode}
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        {isSwipeLocked ? 'Getting ready...' : 'Swipe left or right to redeem'}
-                      </p>
+                      {/* Swipeable Ticket Card */}
+                      <motion.div
+                        ref={coffeeCardRef}
+                        drag="x"
+                        dragConstraints={{ left: 0, right: 0 }}
+                        dragElastic={0.2}
+                        onDragEnd={handleDragEnd}
+                        style={{ x: swipeX, opacity, scale }}
+                        className="bg-card rounded-2xl p-6 border border-border relative overflow-hidden cursor-grab active:cursor-grabbing"
+                      >
+                        {/* Lock indicator */}
+                        {isSwipeLocked && (
+                          <div className="absolute top-2 right-2 text-xs text-muted-foreground flex items-center gap-1 bg-background/80 px-2 py-1 rounded-full">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Please wait...
+                          </div>
+                        )}
 
-                      {/* Visual indicator for swipe */}
-                      {!isSwipeLocked && (
-                        <div className="flex justify-center gap-1 items-center">
-                          <div className="w-8 h-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-pulse" />
-                          <span className="text-xs text-muted-foreground">←  →</span>
+                        <div className="text-center">
+                          <Coffee className="w-12 h-12 mx-auto mb-4 text-primary" />
+                          <h3 className="text-lg font-bold mb-2">Your Coffee Ticket</h3>
+                          <div className="text-4xl font-mono font-bold tracking-wider bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 bg-clip-text text-transparent mb-2">
+                            {ticketCode}
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-3">
+                            {isSwipeLocked ? 'Getting ready...' : 'Swipe left or right to redeem'}
+                          </p>
+
+                          {/* Visual indicator for swipe */}
+                          {!isSwipeLocked && (
+                            <div className="flex justify-center gap-1 items-center">
+                              <div className="w-8 h-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-pulse" />
+                              <span className="text-xs text-muted-foreground">←  →</span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
 
-                    {/* Coffee cup icon below for visual feedback */}
-                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 opacity-20">
-                      <Coffee className="w-16 h-16 text-primary" />
+                        {/* Coffee cup icon below for visual feedback */}
+                        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 opacity-20">
+                          <Coffee className="w-16 h-16 text-primary" />
+                        </div>
+                      </motion.div>
+                    </>
+                  ) : isRedeemed ? (
+                    /* Redeemed State */
+                    <div
+                      ref={coffeeCardRef}
+                      className="bg-card rounded-2xl p-6 border border-border relative overflow-hidden"
+                    >
+                      <div className="text-center">
+                        <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
+                          <CheckCircle2 className="w-8 h-8 text-green-500" />
+                        </div>
+                        <h3 className="text-lg font-bold mb-2 text-muted-foreground">Ticket Redeemed</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Want more coffee? Brew another clip!
+                        </p>
+                        <Button
+                          onClick={() => navigate('/capture')}
+                          className="w-full gap-2"
+                        >
+                          <Video className="w-5 h-5" />
+                          Brew Another Clip
+                        </Button>
+                      </div>
                     </div>
-                  </motion.div>
+                  ) : (
+                    /* Generate Ticket Button */
+                    <div
+                      ref={coffeeCardRef}
+                      className="bg-card rounded-2xl p-6 border border-border relative overflow-hidden"
+                    >
+                      <div className="text-center">
+                        <Coffee className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                        <h3 className="text-lg font-bold mb-4">Get Your Free Coffee</h3>
+                        <Button
+                          onClick={generateTicket}
+                          disabled={generatingTicket}
+                          className="w-full gap-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200"
+                        >
+                          {generatingTicket ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <Coffee className="w-5 h-5" />
+                          )}
+                          Generate Ticket
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </>
-              ) : isRedeemed ? (
-                /* Redeemed State */
-                <div
-                  ref={coffeeCardRef}
-                  className="bg-card rounded-2xl p-6 border border-border relative overflow-hidden"
-                >
+              ) : (
+                // Non-owner CTA
+                <div className="bg-card rounded-2xl p-6 border border-border relative overflow-hidden">
                   <div className="text-center">
-                    <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
-                      <CheckCircle2 className="w-8 h-8 text-green-500" />
-                    </div>
-                    <h3 className="text-lg font-bold mb-2 text-muted-foreground">Ticket Already Redeemed</h3>
+                    <Coffee className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-bold mb-2">Want Some Coffee?</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Want more coffee? Create another clip!
+                      This clip isn't yours, but you can brew your own to get a free coffee ticket!
                     </p>
                     <Button
                       onClick={() => navigate('/capture')}
-                      className="w-full gap-2"
+                      className="w-full gap-2 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white hover:scale-105"
                     >
                       <Video className="w-5 h-5" />
-                      Create New Clip
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                /* Generate Ticket Button */
-                <div
-                  ref={coffeeCardRef}
-                  className="bg-card rounded-2xl p-6 border border-border relative overflow-hidden"
-                >
-                  <div className="text-center">
-                    <Coffee className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="text-lg font-bold mb-4">Get Your Free Coffee</h3>
-                    <Button
-                      onClick={generateTicket}
-                      disabled={generatingTicket}
-                      className="w-full gap-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200"
-                    >
-                      {generatingTicket ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Coffee className="w-5 h-5" />
-                      )}
-                      Generate Ticket
+                      Brew Your Clip
                     </Button>
                   </div>
                 </div>
               )}
-              </motion.div>
-            )}
+            </motion.div>
 
 
           </div>
