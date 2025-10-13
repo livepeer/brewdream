@@ -240,7 +240,7 @@ export async function uploadToLivepeer(
 
     assetData = data as typeof assetData;
     const status = assetData?.status;
-    const progress = assetData?.progress || (attempts / maxAttempts) * 100;
+    const progress = assetData?.progress || (attempts / maxAttempts);
     console.log(`Asset status (attempt ${attempts + 1}/${maxAttempts}):`, status, assetData);
 
     // Report progress to caller

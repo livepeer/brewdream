@@ -816,7 +816,7 @@ export default function Capture() {
 
             // Smooth progression: use API value if greater, otherwise increment by 1%
             setLastDisplayedProgress(prev => {
-              let newProgress = Math.round(progress.progress);
+              let newProgress = Math.round(progress.progress * 100);
               newProgress = newProgress > prev ? newProgress : prev + 1;
               newProgress = Math.min(99, newProgress); // Cap at 99% while processing
               setUploadProgress(`Processing: ${newProgress}%`);
