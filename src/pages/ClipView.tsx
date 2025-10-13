@@ -441,12 +441,13 @@ export default function ClipView() {
               transition={{ duration: 0.4 }}
             >
               <div className="relative aspect-[9/16] max-h-[80vh] w-full bg-black">
-                <iframe
-                  src={`https://lvpr.tv/?v=${clip.asset_playback_id}&autoplay=1&loop=1`}
-                  className="w-full h-full border-0"
-                  allow="autoplay; encrypted-media; picture-in-picture"
-                  allowFullScreen
-                  title="Clip playback"
+                <video
+                  src={`https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls/${clip.asset_playback_id}/static512p0.mp4`}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover"
                 />
               </div>
             </motion.div>
