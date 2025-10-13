@@ -131,19 +131,19 @@ export type Database = {
       users: {
         Row: {
           created_at: string | null
-          email: string
+          email: string | null
           id: string
           twitter_handle: string | null
         }
         Insert: {
           created_at?: string | null
-          email: string
+          email?: string | null
           id?: string
           twitter_handle?: string | null
         }
         Update: {
           created_at?: string | null
-          email?: string
+          email?: string | null
           id?: string
           twitter_handle?: string | null
         }
