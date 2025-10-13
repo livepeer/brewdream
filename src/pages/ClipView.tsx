@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Eye, Heart, Share2, Download, Twitter, Home, Coffee, Loader2, AlertCircle, CheckCircle2, Video } from 'lucide-react';
+import { Eye, Heart, Share2, Download, Twitter, Home, Coffee, Loader2, AlertCircle, CheckCircle2, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/Header';
 import {
@@ -438,15 +438,13 @@ export default function ClipView() {
 
   return (
     <div className="min-h-screen">
-      <Header isAuthenticated={isAuthenticated} />
+      <Header
+        isAuthenticated={isAuthenticated}
+        showBackButton={true}
+        onBackClick={() => navigate('/')}
+      />
 
       <div className="container mx-auto px-6 py-8">
-        {/* Back Button */}
-        <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="mb-6">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Main Content */}
           <div className="lg:col-span-2">
