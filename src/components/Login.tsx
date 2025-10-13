@@ -235,6 +235,17 @@ export function Login() {
                     : 'Send login code'}
                 </Button>
               </form>
+
+              {isAnonymous && (
+                <Button
+                  onClick={() => navigate('/capture')}
+                  disabled={loading}
+                  variant="outline"
+                  className="w-full h-12 border-border text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Stay Anonymous
+                </Button>
+              )}
             </div>
           ) : (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
