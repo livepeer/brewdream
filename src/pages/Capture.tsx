@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Camera, ImageOff, Loader2, Sparkles, RefreshCw, Mic, MicOff, Download } from 'lucide-react';
+import { Camera, ImageOff, Loader2, Sparkles, RefreshCw, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
@@ -177,7 +176,6 @@ export default function Capture() {
   const [micEnabled, setMicEnabled] = useState(false);
   const [micPermissionGranted, setMicPermissionGranted] = useState(false);
   const [micPermissionDenied, setMicPermissionDenied] = useState(false);
-  const [downloadToLocalEnabled, setDownloadToLocalEnabled] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const sourceVideoRef = useRef<HTMLVideoElement>(null);
@@ -755,33 +753,6 @@ export default function Capture() {
     }
   };
 
-  /**
-   * Download a blob to the local browser with a reasonable filename
-   */
-  const downloadBlobToLocal = (blob: Blob, timestamp: number) => {
-    // Create a reasonable filename with timestamp
-    const date = new Date(timestamp);
-    const dateStr = date.toISOString().replace(/[:.]/g, '-').slice(0, -5); // Format: YYYY-MM-DDTHH-MM-SS
-    const filename = `brewdream-clip-${dateStr}.webm`;
-
-    // Create a download link
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-
-    // Clean up
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
-
-    console.log(`Downloaded file locally: ${filename}`);
-  };
-
   const stopRecording = async () => {
     if (!recorderRef.current || !recordStartTimeRef.current || !streamId) {
       return;
@@ -827,15 +798,6 @@ export default function Capture() {
       recorderRef.current = null;
 
       const timestamp = Date.now();
-
-      // Download to local browser if toggle is enabled
-      if (downloadToLocalEnabled) {
-        downloadBlobToLocal(blob, timestamp);
-        toast({
-          title: 'File downloaded',
-          description: 'Video saved to your downloads folder',
-        });
-      }
 
       console.log('Recording stopped, uploading to Livepeer...');
 
@@ -1483,27 +1445,6 @@ export default function Capture() {
                 step={0.01}
                 className="w-full accent-neutral-400"
               />
-            </div>
-
-            {/* Development Toggle: Download to Local */}
-            <div className="pt-3 border-t border-neutral-800">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Download className="w-4 h-4 text-neutral-400" />
-                  <label className="text-sm font-medium text-neutral-300 cursor-pointer" htmlFor="download-toggle">
-                    Download to Browser
-                  </label>
-                </div>
-                <Switch
-                  id="download-toggle"
-                  checked={downloadToLocalEnabled}
-                  onCheckedChange={setDownloadToLocalEnabled}
-                  className="data-[state=checked]:bg-green-600"
-                />
-              </div>
-              <p className="text-xs text-neutral-500 mt-1 ml-6">
-                {downloadToLocalEnabled ? 'Clips will be saved to your downloads folder' : 'Local download disabled'}
-              </p>
             </div>
           </div>
         </div>
