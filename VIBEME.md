@@ -91,9 +91,11 @@ Camera → WebRTC → Daydream Stream (AI effects) → Livepeer (HLS playback)
 **Frontend (`src/`)**:
 - `pages/` - Route components (Capture, ClipView, Index, NotFound)
 - `components/` - Reusable UI (Gallery, Landing, Login) + shadcn/ui library
+  - `DaydreamCanvas.tsx` - Manages camera input, WHIP publishing to Daydream
+  - `StudioRecorder.tsx` - Wraps any video/canvas element, handles recording → Livepeer upload
 - `lib/` - **Core utilities** (where the magic happens):
   - `daydream.ts` - Stream creation, WHIP publishing, prompt updates
-  - `recording.ts` - Video capture, upload, database save
+  - `recording.ts` - Video capture (VideoRecorder class), Livepeer upload, database save
 - `integrations/supabase/` - Database client & generated types
 - `hooks/` - React hooks (use-mobile, use-toast)
 
@@ -404,10 +406,30 @@ SUPABASE_SERVICE_ROLE_KEY=...
 
 ### Recording Implementation Pattern
 
-**Core Flow**: `VideoRecorder` class → Livepeer upload → Database save
+**Component-Based Flow**: `StudioRecorder` component wraps any video/canvas → handles upload
 
 ```typescript
-// Quick example (see docs/RECORDING_IMPLEMENTATION.md for full details)
+// Modern approach (Capture.tsx example)
+<StudioRecorder
+  ref={studioRecorderRef}
+  onProgress={(progress) => { /* update UI */ }}
+  onComplete={(result) => { /* save to DB, navigate */ }}
+  onError={(error) => { /* show toast */ }}
+>
+  <Player.Root src={src}>
+    <Player.Video />
+  </Player.Root>
+</StudioRecorder>
+
+// Parent controls recording
+await studioRecorderRef.current?.startRecording();
+await studioRecorderRef.current?.stopRecording();
+```
+
+**Low-Level Flow** (used internally by StudioRecorder):
+
+```typescript
+// Direct usage of recording.ts utilities
 const recorder = new VideoRecorder(videoElement);
 await recorder.start();
 const { blob, durationMs } = await recorder.stop();
@@ -416,10 +438,13 @@ await saveClipToDatabase({ assetId, playbackId, ... });
 ```
 
 **Key Quirks**:
-- Uses `captureStream()` on `<video>` element (not iframe - Livepeer Player renders to video)
+- `StudioRecorder` wraps any content with video/canvas elements inside
+- Uses `captureStream()` on `<video>` or `<canvas>` elements
+- Supports both Livepeer Player and native video/canvas elements
 - Front camera mirroring at source (canvas-based) before Daydream, not CSS
 - Records AI output, not camera feed
 - Desktop: click-toggle, Mobile: press-hold (UX choice)
+- Parent manages duration enforcement (3-10s), StudioRecorder only handles recording/upload
 
 **Full Documentation**: See [`docs/RECORDING_IMPLEMENTATION.md`](./docs/RECORDING_IMPLEMENTATION.md)
 
@@ -836,9 +861,15 @@ Avoid:
 
 ---
 
-**Last Updated**: 2025-10-13
+**Last Updated**: 2025-10-15
 
 **Recent Changes**:
+- **StudioRecorder component**: Extracted recording/upload logic into reusable component
+  - Wraps any video/canvas element and handles recording → Livepeer upload → asset processing
+  - Exposes `startRecording()`/`stopRecording()` via ref handle
+  - Returns asset info via callbacks (onProgress, onComplete, onError)
+  - Parent (Capture.tsx) now only manages UI state, duration enforcement, and database save
+  - Follows DaydreamCanvas pattern (forwardRef + useImperativeHandle)
 - **Home page gallery implementation**: Added pagination (10 mobile/16 desktop), infinite scroll, real stats
 - **Direct MP4 playback**: Gallery now uses VOD CDN URLs for seamless looping and better performance
 - **Responsive video display**: 1:1 squares on desktop, 9:16 portrait on mobile
