@@ -38,8 +38,8 @@ export interface DaydreamCanvasProps {
       }
     | {
         type: 'camera';
-        mode: 'front' | 'back';
-        mirrorFront?: boolean; // mirror draw for front camera, default true
+        facingMode: 'user' | 'environment';
+        mirrorFront?: boolean; // mirror draw for front camera (user mode), default true
       };
   // Audio source (defaults to silent if not provided)
   audioSource?:
@@ -133,7 +133,7 @@ export const DaydreamCanvas = forwardRef<DaydreamCanvasHandle, DaydreamCanvasPro
 
     // Derive camera settings
     const useCamera = videoSource.type === 'camera';
-    const cameraFacingMode = videoSource.type === 'camera' ? videoSource.mode : 'front';
+    const cameraFacingMode = videoSource.type === 'camera' ? videoSource.facingMode : 'user';
     const mirrorFront = videoSource.type === 'camera' ? (videoSource.mirrorFront ?? true) : true;
 
     // Derive audio settings
@@ -258,6 +258,14 @@ export const DaydreamCanvas = forwardRef<DaydreamCanvasHandle, DaydreamCanvasPro
 
       let cancelled = false;
       let localStream: MediaStream | null = null;
+
+      // Clean up previous camera stream before starting new one
+      // This is crucial when switching between front/back cameras
+      if (ownedCameraStream) {
+        ownedCameraStream.getTracks().forEach(t => t.stop());
+        setOwnedCameraStream(null);
+      }
+
       (async () => {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
@@ -275,12 +283,20 @@ export const DaydreamCanvas = forwardRef<DaydreamCanvasHandle, DaydreamCanvasPro
           onError?.(e);
         }
       })();
+
       return () => {
         cancelled = true;
+        // Clean up in the effect cleanup function
         if (localStream) {
           localStream.getTracks().forEach(t => t.stop());
-          setOwnedCameraStream(null);
         }
+        // Also clean up the owned stream state
+        setOwnedCameraStream(prev => {
+          if (prev) {
+            prev.getTracks().forEach(t => t.stop());
+          }
+          return null;
+        });
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [useCamera, cameraFacingMode, onError, size, isStarted]);
@@ -330,8 +346,8 @@ export const DaydreamCanvas = forwardRef<DaydreamCanvasHandle, DaydreamCanvasPro
                   // Clear before drawing
                   ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
-                  // Mirror for front camera
-                  const needMirror = mirrorFront && cameraFacingMode === 'front' && videoSource.type === 'camera';
+                  // Mirror for front camera (user-facing)
+                  const needMirror = mirrorFront && cameraFacingMode === 'user' && videoSource.type === 'camera';
                   if (needMirror) {
                     ctx.setTransform(-1, 0, 0, 1, sizePx, 0);
                   }

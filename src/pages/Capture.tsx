@@ -151,7 +151,7 @@ const hasMultipleCameras = (): boolean => {
 };
 
 export default function Capture() {
-  const [cameraType, setCameraType] = useState<'front' | 'back' | null>(null);
+  const [cameraType, setCameraType] = useState<'user' | 'environment' | null>(null);
   const [loading, setLoading] = useState(false);
   const [streamId, setStreamId] = useState<string | null>(null);
   const [playbackId, setPlaybackId] = useState<string | null>(null);
@@ -213,14 +213,14 @@ export default function Capture() {
     console.log('All media streams stopped');
   }, []);
 
-  const initializeStream = useCallback(async (_type: 'front' | 'back', _initialPrompt: string) => {
+  const initializeStream = useCallback(async (_type: 'user' | 'environment', _initialPrompt: string) => {
     // Simplified: streaming is handled by DaydreamCanvas; just show loading until onReady
     setLoading(true);
   }, []);
 
-  const selectCamera = useCallback(async (type: 'front' | 'back') => {
+  const selectCamera = useCallback(async (type: 'user' | 'environment') => {
     setCameraType(type);
-    const randomPrompt = type === 'front'
+    const randomPrompt = type === 'user'
       ? FRONT_PROMPTS[Math.floor(Math.random() * FRONT_PROMPTS.length)]
       : BACK_PROMPTS[Math.floor(Math.random() * BACK_PROMPTS.length)];
     setPrompt(randomPrompt);
@@ -236,7 +236,7 @@ export default function Capture() {
       if (shouldAutoStart) {
         setAutoStartChecked(true);
         // Desktop device - auto-start with default camera
-        selectCamera('front');
+        selectCamera('user');
       } else {
         setAutoStartChecked(true);
       }
@@ -725,7 +725,7 @@ export default function Capture() {
             {showMultipleCameras ? (
               <>
                 <Button
-                  onClick={() => selectCamera('front')}
+                  onClick={() => selectCamera('user')}
                   className="w-full h-20 bg-neutral-900 border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 transition-all duration-200"
                   variant="outline"
                 >
@@ -739,7 +739,7 @@ export default function Capture() {
                 </Button>
 
                 <Button
-                  onClick={() => selectCamera('back')}
+                  onClick={() => selectCamera('environment')}
                   className="w-full h-20 bg-neutral-900 border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 transition-all duration-200"
                   variant="outline"
                 >
@@ -754,7 +754,7 @@ export default function Capture() {
               </>
             ) : (
               <Button
-                onClick={() => selectCamera('front')}
+                onClick={() => selectCamera('user')}
                 className="w-full h-20 bg-gradient-to-r from-primary to-accent text-white transition-all duration-200"
               >
                 <div className="flex items-center gap-4">
@@ -825,7 +825,7 @@ export default function Capture() {
               className="w-full h-full object-cover"
               videoSource={{
                 type: 'camera',
-                mode: cameraType === 'front' ? 'front' : 'back',
+                facingMode: cameraType === 'user' ? 'user' : 'environment',
                 mirrorFront: true,
               }}
               audioSource={
@@ -953,7 +953,7 @@ export default function Capture() {
                   variant="outline"
                   size="icon"
                   onClick={() => {
-                    const prompts = cameraType === 'front' ? FRONT_PROMPTS : BACK_PROMPTS;
+                    const prompts = cameraType === 'user' ? FRONT_PROMPTS : BACK_PROMPTS;
                     const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
                     setPrompt(randomPrompt);
                   }}
