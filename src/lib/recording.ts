@@ -4,6 +4,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import fixWebmDuration from 'fix-webm-duration';
+import * as tus from 'tus-js-client';
 
 interface RecordingResult {
   blob: Blob;
@@ -185,40 +186,104 @@ export async function uploadToLivepeer(
     throw new Error(`Failed to request upload: ${uploadError.message || 'Unknown error'}`);
   }
 
-  if (!uploadData?.uploadUrl || !uploadData?.assetId) {
+  if (!uploadData?.assetId) {
     console.error('Invalid upload response:', uploadData);
-    throw new Error('Failed to get upload URL from server');
+    throw new Error('Failed to get asset ID from server');
   }
 
-  console.log('Got upload URL for asset:', uploadData.assetId);
+  console.log('Got upload data for asset:', uploadData.assetId);
 
-  // Step 2: Upload the blob
+  // Step 2: Upload using TUS resumable upload (preferred) or PUT fallback
   const file = new File([blob], filename, { type: blob.type });
 
-  console.log('Uploading blob...', {
-    size: blob.size,
-    type: blob.type,
-    filename
-  });
+  let uploaded = false;
+  if (uploadData?.tus?.url) {
+    // Use TUS resumable upload
+    console.log('Starting TUS upload...', {
+      size: blob.size,
+      type: blob.type,
+      filename,
+      tusEndpoint: uploadData.tusEndpoint
+    });
 
-  onProgress?.({ phase: 'uploading', step: 'Uploading video...' });
+    onProgress?.({ phase: 'uploading', step: 'Uploading video...' });
 
-  const putResponse = await fetch(uploadData.uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': blob.type || 'video/webm',
-    },
-    body: blob, // Use blob directly instead of File wrapper
-  });
+    // Create TUS upload
+    const upload = new tus.Upload(file, {
+      endpoint: uploadData.tusEndpoint,
+      retryDelays: [0, 1000, 2000, 5000, 10000, 20000],
+      metadata: {
+        filename: filename,
+        filetype: blob.type || 'video/webm',
+      },
+      onError: (error) => {
+        console.error('TUS upload error:', error);
+        throw new Error(`Upload failed: ${error.message || 'Unknown TUS error'}`);
+      },
+      onProgress: (bytesUploaded, bytesTotal) => {
+        const progress = bytesUploaded / bytesTotal;
+        console.log(`Upload progress: ${Math.round(progress * 100)}% (${bytesUploaded}/${bytesTotal} bytes)`);
+        onProgress?.({
+          phase: 'uploading',
+          step: `Uploading video...`,
+          progress: progress
+        });
+      },
+      onSuccess: () => {
+        console.log('TUS upload successful, waiting for asset to be ready...');
+        onProgress?.({ phase: 'processing', step: 'Processing video...' });
+      }
+    });
 
-  if (!putResponse.ok) {
-    const errorText = await putResponse.text().catch(() => 'Unknown error');
-    console.error('Upload failed:', putResponse.status, errorText);
-    throw new Error(`Upload failed: ${putResponse.status} - ${errorText}`);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        upload.onSuccess = () => {
+          console.log('TUS upload completed successfully');
+          resolve();
+        };
+        upload.onError = (error) => {
+          console.error('TUS upload failed:', error);
+          reject(new Error(`TUS upload failed: ${error.message || 'Unknown error'}`));
+        };
+        upload.start();
+      });
+      uploaded = true;
+    } catch (error) {
+      console.error('TUS upload failed:', error);
+    }
   }
+  if (!uploaded && uploadData?.uploadUrl) {
+    // Fallback to PUT upload
+    console.log('TUS not available, using PUT upload fallback...', {
+      size: blob.size,
+      type: blob.type,
+      filename,
+      uploadUrl: uploadData.uploadUrl
+    });
 
-  console.log('Upload successful, waiting for asset to be ready...');
-  onProgress?.({ phase: 'processing', step: 'Processing video...' });
+    onProgress?.({ phase: 'uploading', step: 'Uploading video...' });
+
+    const putResponse = await fetch(uploadData.uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': blob.type || 'video/webm',
+      },
+      body: blob,
+    });
+
+    if (!putResponse.ok) {
+      const errorText = await putResponse.text().catch(() => 'Unknown error');
+      console.error('PUT upload failed:', putResponse.status, errorText);
+      throw new Error(`Upload failed: ${putResponse.status} - ${errorText}`);
+    }
+    uploaded = true;
+
+    console.log('PUT upload successful, waiting for asset to be ready...');
+    onProgress?.({ phase: 'processing', step: 'Processing video...' });
+  }
+  if (!uploaded) {
+    throw new Error('Upload failed');
+  }
 
   // Step 3: Poll for asset readiness with better error handling
   let attempts = 0;
