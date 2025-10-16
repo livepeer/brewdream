@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import confetti from 'canvas-confetti';
+import { PlayerWithControls } from '@/components/PlayerWithControls';
 
 interface Clip {
   id: string;
@@ -456,27 +457,23 @@ export default function ClipView() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4 }}
             >
-              <video
-                src={`https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls/${clip.asset_playback_id}/static512p0.mp4`}
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="w-full h-full object-contain"
+              <PlayerWithControls
+                src={[
+                  {
+                    src: `https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls/${clip.asset_playback_id}/static512p0.mp4`,
+                    type: "video",
+                    mime: "video/mp4",
+                    width: 500,
+                    height: 500,
+                  },
+                ]}
               />
             </motion.div>
-
-
-
-
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-
-
-
-                 {/* Title and Description */}
+            {/* Title and Description */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -490,28 +487,28 @@ export default function ClipView() {
               </p>
             </motion.div>
 
-                    {/* Actions */}
-                    <motion.div
+            {/* Actions */}
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.4 }}
               className="flex flex-wrap gap-3"
             >
-              <Button variant={isLiked ? "default" : "outline"} size="lg" onClick={handleLike} className="gap-2">
+              <Button variant={isLiked ? "default" : "outline"} onClick={handleLike} className="gap-2">
                 <Heart className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`} />
                 {likesCount}
               </Button>
 
-              <Button variant="outline" size="lg" className="gap-2 bg-transparent">
+              <Button variant="outline" className="gap-2 bg-transparent">
                 <Eye className="h-5 w-5" />
-                {viewsLoading ? '-' : viewCount}
+                {viewsLoading ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : viewCount}
               </Button>
 
-              <Button variant="outline" size="lg" onClick={shareToTwitter} className="gap-2 bg-transparent">
+              <Button variant="outline" onClick={shareToTwitter} className="gap-2 bg-transparent">
                 <Share2 className="h-5 w-5" />
               </Button>
 
-              <Button variant="outline" size="lg" onClick={handleDownload} className="gap-2 bg-transparent">
+              <Button variant="outline" onClick={handleDownload} className="gap-2 bg-transparent">
                 <Download className="h-5 w-5" />
               </Button>
             </motion.div>
@@ -645,8 +642,6 @@ export default function ClipView() {
                 </div>
               )}
             </motion.div>
-
-
           </div>
         </div>
       </div>
