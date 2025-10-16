@@ -349,7 +349,7 @@ export default function Capture() {
       // Show upload progress with percentage (TUS only)
       const uploadPercent = Math.round(progress.progress * 100);
       setUploadProgress(`Uploading: ${uploadPercent}%`);
-    } if (progress.phase === 'processing' && progress.progress !== undefined) {
+    } else if (progress.phase === 'processing' && progress.progress !== undefined) {
       // Smooth progression: use API value if greater, otherwise increment by 1%
       setLastDisplayedProgress(prev => {
         let newProgress = Math.round(progress.progress * 100);

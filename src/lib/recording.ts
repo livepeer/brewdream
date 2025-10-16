@@ -206,7 +206,7 @@ export async function uploadToLivepeer(
       tusEndpoint: uploadData.tusEndpoint
     });
 
-    onProgress?.({ phase: 'uploading', step: 'Uploading video...' });
+    onProgress?.({ phase: 'uploading', step: 'Uploading...' });
 
     try {
       await new Promise<void>((resolve, reject) => {
@@ -220,11 +220,10 @@ export async function uploadToLivepeer(
           },
           onProgress: (bytesUploaded, bytesTotal) => {
             const progress = bytesUploaded / bytesTotal;
-            console.log(`Upload progress: ${Math.round(progress * 100)}% (${bytesUploaded}/${bytesTotal} bytes)`);
             onProgress?.({
               phase: 'uploading',
-              step: `Uploading video...`,
-              progress: progress
+              step: `Uploading...`,
+              progress
             });
           },
           onSuccess: () => {
@@ -254,7 +253,7 @@ export async function uploadToLivepeer(
       uploadUrl: uploadData.uploadUrl
     });
 
-    onProgress?.({ phase: 'uploading', step: 'Uploading video...' });
+    onProgress?.({ phase: 'uploading', step: 'Uploading...' });
 
     const putResponse = await fetch(uploadData.uploadUrl, {
       method: 'PUT',

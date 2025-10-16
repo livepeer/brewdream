@@ -134,7 +134,7 @@ export const StudioRecorder = forwardRef<StudioRecorderHandle, StudioRecorderPro
         const filename = `studio-recording-${timestamp}.webm`;
 
         // Upload to Livepeer Studio with progress tracking
-        onProgress?.({ phase: 'uploading', step: 'Uploading to Livepeer Studio...' });
+        onProgress?.({ phase: 'uploading', step: 'Uploading...' });
 
         const { assetId, playbackId, downloadUrl } = await uploadToLivepeer(
           blob,
