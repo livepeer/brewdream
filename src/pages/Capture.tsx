@@ -173,7 +173,6 @@ export default function Capture() {
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [lastDisplayedProgress, setLastDisplayedProgress] = useState<number>(0);
   const [micEnabled, setMicEnabled] = useState(false);
-  const [micPermissionGranted, setMicPermissionGranted] = useState(false);
   const [micPermissionDenied, setMicPermissionDenied] = useState(false);
 
   const studioRecorderRef = useRef<StudioRecorderHandle | null>(null);
@@ -202,6 +201,10 @@ export default function Capture() {
     setLoading(true);
   }, []);
 
+  // We use a separate state to track if we should show camera selection
+  // Only show camera selection screen if there are actually multiple cameras
+  const [showCameraSelection, setShowCameraSelection] = useState(hasMultipleCameras());
+
   const selectCamera = useCallback(async (type: 'user' | 'environment') => {
     setCameraType(type);
     setShowCameraSelection(false); // Hide camera selection screen
@@ -209,26 +212,6 @@ export default function Capture() {
     setPrompt('');
     // Don't start stream yet - wait for user to configure params and hit "Start"
   }, []);
-
-  // Start stream immediately when component mounts (pre-warming)
-  // We use a separate state to track if we should show camera selection
-  const [showCameraSelection, setShowCameraSelection] = useState(true);
-
-  useEffect(() => {
-    // Start pre-warming stream as soon as component loads
-    // We'll use a default camera type for pre-warming, but still show selection on mobile
-    if (!cameraType) {
-      setCameraType('user'); // This will trigger the canvas to start with blank video
-
-      // On mobile, still show camera selection screen
-      if (hasMultipleCameras()) {
-        setShowCameraSelection(true);
-      } else {
-        // Desktop - skip camera selection, go straight to param setup
-        setShowCameraSelection(false);
-      }
-    }
-  }, [cameraType]);
 
   const startStream = useCallback(async () => {
     if (!cameraType) return;
@@ -264,10 +247,6 @@ export default function Capture() {
 
   const toggleMicrophone = () => {
     setMicEnabled(!micEnabled);
-    toast({
-      title: !micEnabled ? 'Microphone enabled' : 'Microphone muted',
-      description: !micEnabled ? 'Now streaming live audio' : 'Audio is now muted',
-    });
   };
 
   // Params are passed directly to DaydreamCanvas (serial updates handled internally)
@@ -999,7 +978,6 @@ export default function Capture() {
   return (
     <>
       {/* Secret streaming container - hidden during setup, visible after */}
-      {cameraType && (
         <div
           className={
             setupComplete
@@ -1164,7 +1142,7 @@ export default function Capture() {
                   variant="outline"
                   size="icon"
                   onClick={() => {
-                    const prompts = cameraType === 'user' ? FRONT_PROMPTS : BACK_PROMPTS;
+                    const prompts = !cameraType ? ["passthrough"] : (cameraType === 'user' ? FRONT_PROMPTS : BACK_PROMPTS);
                     const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
                     setPrompt(randomPrompt);
                   }}
@@ -1295,7 +1273,6 @@ export default function Capture() {
         </div>
       </div>
     </div>
-      )}
 
       {/* Main content (camera selection / setup screens) */}
       {content}

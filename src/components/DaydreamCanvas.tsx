@@ -275,7 +275,6 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
         return;
       }
 
-      console.log('useEffect video source', videoSource.type, effectiveStream);
       video.srcObject = effectiveStream;
       video.play().catch((e) => {
         // Silent fail - autoplay handles this
