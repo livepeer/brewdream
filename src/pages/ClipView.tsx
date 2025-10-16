@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo, RefObject } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
+import { motion, useMotionValue, useTransform, PanInfo, animate } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, Heart, Share2, Download, Twitter, Home, Coffee, Loader2, AlertCircle, CheckCircle2, Video } from 'lucide-react';
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import confetti from 'canvas-confetti';
 import { PlayerWithControls } from '@/components/PlayerWithControls';
+import { useCinematicVideoGradient } from '@/hooks/useCinematicVideoGradient';
 
 interface Clip {
   id: string;
@@ -36,8 +37,67 @@ interface Ticket {
   redeemed: boolean;
 }
 
+
+export function VideoGlow({
+  targetRef,
+  strength = 1,
+  expand = 24,
+  opacity = 0.65,
+  blend = "screen",
+}: {
+  targetRef: RefObject<HTMLElement>;
+  strength?: number;
+  expand?: number;
+  opacity?: number;
+  blend?: "screen" | "normal" | "plus-lighter";
+}) {
+  const bgStyle = useCinematicVideoGradient(targetRef);
+  const hasGradient = bgStyle?.background !== undefined && !bgStyle.background.includes("#111");
+
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute z-0 rounded-[inherit]"
+      style={{
+        inset: `-${expand}px`,
+        filter: `blur(${40 * strength}px)`,
+        transform: "scale(1.06)",
+        mixBlendMode: blend,
+      }}
+    >
+      {/* Fallback neutral glow */}
+      <motion.div
+        initial={{ opacity: 1 }}
+        animate={{ opacity: hasGradient ? 0 : opacity }}
+        transition={{ duration: 1.5, ease: "easeInOut" }}
+        style={{
+          background: "linear-gradient(135deg, #111 0%, #333 100%)",
+          inset: 0,
+          position: "absolute",
+          borderRadius: "inherit",
+        }}
+      />
+
+      {/* Cinematic gradient glow */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: hasGradient ? opacity : 0 }}
+        transition={{ duration: 1.5, ease: "easeInOut" }}
+        style={{
+          background: bgStyle.background,
+          inset: 0,
+          position: "absolute",
+          borderRadius: "inherit",
+        }}
+      />
+    </div>
+  );
+}
+
 export default function ClipView() {
   const { id } = useParams();
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const bgStyle = useCinematicVideoGradient(videoContainerRef);
   const navigate = useNavigate();
   const [clip, setClip] = useState<Clip | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,6 +119,11 @@ export default function ClipView() {
   const swipeX = useMotionValue(0);
   const opacity = useTransform(swipeX, [-150, 0, 150], [0, 1, 0]);
   const scale = useTransform(swipeX, [-150, 0, 150], [0.9, 1, 0.9]);
+  const rotate = useTransform(swipeX, [-150, 0, 150], [-12, 0, 12]);  // rotate left/right
+  const y = useTransform(swipeX, [-150, 0, 150], [20, 0, -20]);       // subtle lift or drop
+  const shadow = useTransform(swipeX, [-150, 0, 150],
+    ["0px 20px 40px rgba(0,0,0,0.3)", "0px 10px 20px rgba(0,0,0,0.2)", "0px 20px 40px rgba(0,0,0,0.3)"]
+  );
 
   useEffect(() => {
     loadClip();
@@ -359,8 +424,8 @@ export default function ClipView() {
       // Swipe successful - redeem ticket
       await redeemTicket(info.offset.x);
     } else {
-      // Snap back
-      swipeX.set(0);
+      // Snap back with spring animation
+      animate(swipeX, 0, { type: "spring", stiffness: 200, damping: 15 });
     }
   };
 
@@ -369,16 +434,17 @@ export default function ClipView() {
 
     setIsRedeeming(true);
 
-    // Optimistically animate ticket away to complete the swipe
     const finalPosition = swipeDirection > 0 ? 400 : -400;
-    swipeX.set(finalPosition);
 
-    // Wait for swipe animation to finish
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Animate out with rotation and ease
+    await animate(swipeX, finalPosition, { type: "spring", stiffness: 300, damping: 20 });
+    await new Promise(resolve => setTimeout(resolve, 250));
 
     // Optimistically show redeemed state
     setIsRedeemed(true);
-    swipeX.set(0);
+
+    // Animate it snapping back (for consistency)
+    await animate(swipeX, 0, { type: "spring", stiffness: 250, damping: 18 });
 
     try {
       const { data, error } = await supabase.functions.invoke('redeem-ticket', {
@@ -438,41 +504,51 @@ export default function ClipView() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen h-full">
       <Header
         isAuthenticated={isAuthenticated}
         showBackButton={true}
         onBackClick={() => navigate('/')}
       />
 
-      <div className="container mx-auto px-6 py-8">
-        <div className="grid gap-4 lg:gap-8 lg:grid-cols-3">
-          {/* Main Content */}
-          <div className="lg:col-span-2">
-            {/* Video Player */}
+      <div className="mx-auto overflow-hidden">
+        <div className="grid lg:grid-cols-3 lg:min-h-[calc(100dvh-64px)]">
+          {/* LEFT: center the player */}
+          <div className="lg:col-span-2 relative isolate px-4 py-8 lg:pt-0 lg:flex lg:items-center lg:justify-center">
+            <VideoGlow targetRef={videoContainerRef} strength={1} expand={28} opacity={0.7} />
+
             <motion.div
               layoutId={`clip-${clip.id}`}
-              className="relative mb-4 md:mb-6 overflow-hidden rounded-2xl bg-black border border-neutral-800 shadow-lg shadow-[0_0_15px_2px_theme(colors.neutral.800/0.4)] aspect-square w-full max-w-[600px] lg:max-h-[60vh] mx-auto"
+              ref={videoContainerRef}
+              // remove bottom margins so true centering works
+              className="relative overflow-hidden rounded-2xl border border-neutral-800 shadow-lg aspect-square w-full max-w-[500px] lg:max-h-[500px]"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4 }}
             >
               <PlayerWithControls
-                src={[
-                  {
-                    src: `https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls/${clip.asset_playback_id}/static512p0.mp4`,
-                    type: "video",
-                    mime: "video/mp4",
-                    width: 500,
-                    height: 500,
-                  },
-                ]}
+                src={[{
+                  src: `https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls/${clip.asset_playback_id}/static512p0.mp4`,
+                  type: "video",
+                  mime: "video/mp4",
+                  width: 500,
+                  height: 500,
+                }]}
               />
             </motion.div>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
+          {/* RIGHT: full-height sidebar (sticky under header) */}
+          <aside
+            className="
+              relative z-20
+              space-y-6 bg-neutral-950 p-8
+              lg:sticky lg:top-16              
+              lg:h-[calc(100dvh-64px)] 
+              lg:overflow-y-auto
+              rounded-t-3xl md:rounded-t-none
+            "
+          >
             {/* Title and Description */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -538,7 +614,16 @@ export default function ClipView() {
                         dragConstraints={{ left: 0, right: 0 }}
                         dragElastic={0.2}
                         onDragEnd={handleDragEnd}
-                        style={{ x: swipeX, opacity, scale }}
+                        style={{ 
+                          x: swipeX, 
+                          opacity, 
+                          scale, 
+                          rotate, 
+                          y,
+                          boxShadow: shadow,
+                          transformStyle: "preserve-3d",
+                          perspective: 800,
+                        }}
                         className="bg-card rounded-2xl p-6 border border-border relative overflow-hidden cursor-grab active:cursor-grabbing"
                       >
                         {/* Lock indicator */}
@@ -576,27 +661,71 @@ export default function ClipView() {
                     </>
                   ) : isRedeemed ? (
                     /* Redeemed State */
-                    <div
+                    <motion.div
                       ref={coffeeCardRef}
-                      className="bg-card rounded-2xl p-6 border border-border relative overflow-hidden"
+                      key="redeemed-card"
+                      initial={{ y: 200, opacity: 0, scale: 0.9 }}
+                      animate={{
+                        y: 0,
+                        opacity: 1,
+                        scale: 1,
+                        transition: { type: "spring", stiffness: 80, damping: 12 },
+                      }}
+                      exit={{ y: 200, opacity: 0, scale: 0.95 }}
+                      className="bg-card rounded-2xl p-6 border border-border relative overflow-hidden shadow-xl"
+                      style={{ zIndex: 10, position: "relative" }}
+                      onAnimationStart={() => {
+                        // 🎉 Confetti burst behind the card
+                        if (coffeeCardRef.current) {
+                          const rect = coffeeCardRef.current.getBoundingClientRect();
+                          const x = (rect.left + rect.width / 2) / window.innerWidth;
+                          const y = (rect.top + rect.height / 2) / window.innerHeight;
+
+                          // Main burst
+                          confetti({
+                            particleCount: 120,
+                            startVelocity: 40,
+                            spread: 90,
+                            origin: { x, y },
+                            ticks: 200,
+                            scalar: 1.3,
+                            colors: ['#b87333', '#d1a35d', '#fff7e6'],
+                          });
+
+                          // Secondary slower burst for layering
+                          setTimeout(() => {
+                            confetti({
+                              particleCount: 60,
+                              startVelocity: 25,
+                              spread: 80,
+                              origin: { x, y: y - 0.1 },
+                              ticks: 180,
+                              scalar: 1.1,
+                              colors: ['#c0a080', '#ffffff'],
+                            });
+                          }, 200);
+                        }
+                      }}
                     >
-                      <div className="text-center">
+                      <div className="text-center relative z-10">
                         <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
                           <CheckCircle2 className="w-8 h-8 text-green-500" />
                         </div>
-                        <h3 className="text-lg font-bold mb-2 text-muted-foreground">Ticket Redeemed</h3>
+                        <h3 className="text-lg font-bold mb-2 text-green-400">Enjoy your coffee! ☕</h3>
                         <p className="text-sm text-muted-foreground mb-4">
-                          Want more coffee? Brew another clip!
+                          Want another one? Brew another clip!
                         </p>
                         <Button
                           onClick={() => navigate('/capture')}
-                          className="w-full gap-2"
+                          className="w-full gap-2 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white hover:scale-105 transition-transform"
                         >
                           <Video className="w-5 h-5" />
                           Brew Another Clip
                         </Button>
                       </div>
-                    </div>
+
+                
+                    </motion.div>
                   ) : (
                     /* Generate Ticket Button */
                     <div
@@ -642,7 +771,7 @@ export default function ClipView() {
                 </div>
               )}
             </motion.div>
-          </div>
+          </aside>
         </div>
       </div>
 

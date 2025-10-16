@@ -13,7 +13,7 @@ export function Header({ isAuthenticated = false, showBackButton = false, onBack
   const [isRecording, setIsRecording] = useState(false)
 
   return (
-    <header className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative z-50">
       <div className="container mx-auto flex h-20 items-center justify-between px-6">
         {/* Left section - Back Button or empty space */}
         {showBackButton && (

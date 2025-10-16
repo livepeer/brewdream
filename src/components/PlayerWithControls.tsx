@@ -39,6 +39,7 @@ export function PlayerWithControls(props: { src: Src[] | null }) {
             loop
             muted
             playsInline
+            crossOrigin="anonymous"
             className={cn("h-full w-full transition")}
           />
   
