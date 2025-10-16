@@ -208,43 +208,36 @@ export async function uploadToLivepeer(
 
     onProgress?.({ phase: 'uploading', step: 'Uploading video...' });
 
-    // Create TUS upload
-    const upload = new tus.Upload(file, {
-      endpoint: uploadData.tusEndpoint,
-      retryDelays: [0, 1000, 2000, 5000, 10000, 20000],
-      metadata: {
-        filename: filename,
-        filetype: blob.type || 'video/webm',
-      },
-      onError: (error) => {
-        console.error('TUS upload error:', error);
-        throw new Error(`Upload failed: ${error.message || 'Unknown TUS error'}`);
-      },
-      onProgress: (bytesUploaded, bytesTotal) => {
-        const progress = bytesUploaded / bytesTotal;
-        console.log(`Upload progress: ${Math.round(progress * 100)}% (${bytesUploaded}/${bytesTotal} bytes)`);
-        onProgress?.({
-          phase: 'uploading',
-          step: `Uploading video...`,
-          progress: progress
-        });
-      },
-      onSuccess: () => {
-        console.log('TUS upload successful, waiting for asset to be ready...');
-        onProgress?.({ phase: 'processing', step: 'Processing video...' });
-      }
-    });
-
     try {
       await new Promise<void>((resolve, reject) => {
-        upload.onSuccess = () => {
-          console.log('TUS upload completed successfully');
-          resolve();
-        };
-        upload.onError = (error) => {
-          console.error('TUS upload failed:', error);
-          reject(new Error(`TUS upload failed: ${error.message || 'Unknown error'}`));
-        };
+        // Create TUS upload inside the promise
+        const upload = new tus.Upload(file, {
+          endpoint: uploadData.tusEndpoint,
+          retryDelays: [0, 1000, 2000, 5000, 10000, 20000],
+          metadata: {
+            filename: filename,
+            filetype: blob.type || 'video/webm',
+          },
+          onProgress: (bytesUploaded, bytesTotal) => {
+            const progress = bytesUploaded / bytesTotal;
+            console.log(`Upload progress: ${Math.round(progress * 100)}% (${bytesUploaded}/${bytesTotal} bytes)`);
+            onProgress?.({
+              phase: 'uploading',
+              step: `Uploading video...`,
+              progress: progress
+            });
+          },
+          onSuccess: () => {
+            console.log('TUS upload completed successfully');
+            onProgress?.({ phase: 'processing', step: 'Processing video...' });
+            resolve();
+          },
+          onError: (error) => {
+            console.error('TUS upload failed:', error);
+            reject(new Error(`TUS upload failed: ${error.message || 'Unknown error'}`));
+          }
+        });
+
         upload.start();
       });
       uploaded = true;
