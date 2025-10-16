@@ -239,21 +239,32 @@ export default function Capture() {
 
   // Params are passed directly to DaydreamCanvas (serial updates handled internally)
 
-  const calculateTIndexList = (intensityVal: number, qualityVal: number): number[] => {
-    let baseIndices: number[];
+  const calculateTIndexList = (intensity: number, quality: number): number[] => {
+    let t_index_list: number[];
 
-    if (qualityVal < 0.25) {
-      baseIndices = [6];
-    } else if (qualityVal < 0.50) {
-      baseIndices = [6, 12];
-    } else if (qualityVal < 0.75) {
-      baseIndices = [6, 12, 18];
+    // quality determines the number of indexes in the t_index_list and adds a constant to each index
+    let qualityExtra: number;
+    if (quality < 0.25) {
+      t_index_list = [6];
+      qualityExtra = quality * 24;
+    } else if (quality < 0.50) {
+      t_index_list = [6, 12];
+      qualityExtra = (quality - 0.25) * 24;
+    } else if (quality < 0.75) {
+      t_index_list = [6, 12, 18];
+      qualityExtra = (quality - 0.50) * 24;
     } else {
-      baseIndices = [6, 12, 18, 24];
+      t_index_list = [6, 12, 18, 24];
+      qualityExtra = (quality - 0.75) * 24;
     }
+    t_index_list = t_index_list.map(v => v + qualityExtra);
 
-    const scale = 2.62 - 0.132 * intensityVal;
-    return baseIndices.map(idx => Math.max(0, Math.min(50, Math.round(idx * scale))));
+    // intensity scales the values, higher intensity -> lower values
+    const intensityScale = 2.32 - 0.132 * intensity;
+    t_index_list = t_index_list.map(v => v * intensityScale);
+
+    // clamp and round the values
+    return t_index_list.map(v => Math.max(0, Math.min(49, Math.round(v))));
   };
 
   const startRecording = async () => {
