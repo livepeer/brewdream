@@ -1,22 +1,33 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { Camera, ImageOff, Loader2, Sparkles, RefreshCw, Mic, MicOff } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Slider } from '@/components/ui/slider';
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Camera,
+  ImageOff,
+  Loader2,
+  Sparkles,
+  RefreshCw,
+  Mic,
+  MicOff,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import {
   Popover,
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import * as Player from '@livepeer/react/player';
-import type { StreamDiffusionParams } from '@/lib/daydream';
-import { DaydreamCanvas } from '@/components/DaydreamCanvas';
-import { StudioRecorder, type StudioRecorderHandle } from '@/components/StudioRecorder';
-import { saveClipToDatabase } from '@/lib/recording';
+import * as Player from "@livepeer/react/player";
+import type { StreamDiffusionParams } from "@/lib/daydream";
+import { DaydreamCanvas } from "@/components/DaydreamCanvas";
+import {
+  StudioRecorder,
+  type StudioRecorderHandle,
+} from "@/components/StudioRecorder";
+import { saveClipToDatabase } from "@/lib/recording";
 
 const FRONT_PROMPTS = [
   "studio ghibli portrait, soft rim light",
@@ -52,7 +63,7 @@ const FRONT_PROMPTS = [
   "tribal mask portrait, bold patterns, ceremonial paint",
   "graffiti street art portrait, spray paint drips, urban",
   "cel-shaded anime portrait, bold outlines, flat colors",
-  "ethereal ghost portrait, translucent, wispy trails"
+  "ethereal ghost portrait, translucent, wispy trails",
 ];
 
 const BACK_PROMPTS = [
@@ -90,66 +101,71 @@ const BACK_PROMPTS = [
   "futuristic laboratory, holographic displays, sci-fi tech",
   "enchanted library, floating books, magical atmosphere",
   "cherry blossom garden, pink petals falling, serene",
-  "gothic cathedral interior, stained glass, divine rays"
+  "gothic cathedral interior, stained glass, divine rays",
 ];
 
 const TEXTURES = [
   {
-    id: 'lava',
-    url: 'https://t4.ftcdn.net/jpg/01/83/14/47/360_F_183144766_dbGaN37u6a4VCliXQ6wcarerpYmuLAto.jpg',
-    name: 'Lava'
+    id: "lava",
+    url: "https://t4.ftcdn.net/jpg/01/83/14/47/360_F_183144766_dbGaN37u6a4VCliXQ6wcarerpYmuLAto.jpg",
+    name: "Lava",
   },
   {
-    id: 'galaxy_orion',
-    url: 'https://science.nasa.gov/wp-content/uploads/2023/04/orion-nebula-xlarge_web-jpg.webp',
-    name: 'Galaxy'
+    id: "galaxy_orion",
+    url: "https://science.nasa.gov/wp-content/uploads/2023/04/orion-nebula-xlarge_web-jpg.webp",
+    name: "Galaxy",
   },
   {
-    id: 'dragon_scales',
-    url: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_tiles/roof_tiles_diff_1k.jpg',
-    name: 'Dragon Scales (Roof Tiles, PH 1K)'
+    id: "dragon_scales",
+    url: "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_tiles/roof_tiles_diff_1k.jpg",
+    name: "Dragon Scales (Roof Tiles, PH 1K)",
   },
   {
-    id: 'water_ripples',
-    url: 'https://media.gettyimages.com/id/585332126/photo/rock-face.jpg?s=612x612&w=gi&k=20&c=bX6I0qs7hVDXs0ZUaqPUb1uLkLaZm-ASZxVd5TDXW-A=',
-    name: 'Water Ripples (TextureLabs)'
+    id: "water_ripples",
+    url: "https://media.gettyimages.com/id/585332126/photo/rock-face.jpg?s=612x612&w=gi&k=20&c=bX6I0qs7hVDXs0ZUaqPUb1uLkLaZm-ASZxVd5TDXW-A=",
+    name: "Water Ripples (TextureLabs)",
   },
   {
-    id: 'lightning',
-    url: 'https://opengameart.org/sites/default/files/l1.png',
-    name: 'Lightning Bolt (OGA PNG)'
+    id: "lightning",
+    url: "https://opengameart.org/sites/default/files/l1.png",
+    name: "Lightning Bolt (OGA PNG)",
   },
   {
-    id: 'sand_dunes',
-    url: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_sand/aerial_sand_diff_1k.jpg',
-    name: 'Sand Dunes (PH 1K)'
+    id: "sand_dunes",
+    url: "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_sand/aerial_sand_diff_1k.jpg",
+    name: "Sand Dunes (PH 1K)",
   },
   {
-    id: 'sand_dunes_2',
-    url: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_beach_01/aerial_beach_01_diff_1k.jpg',
-    name: 'Beach Ripples (PH 1K)'
+    id: "sand_dunes_2",
+    url: "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_beach_01/aerial_beach_01_diff_1k.jpg",
+    name: "Beach Ripples (PH 1K)",
   },
   {
-    id: 'foam_ocean',
-    url: 'https://t3.ftcdn.net/jpg/02/03/50/32/360_F_203503200_3M3ZmpW9nhU6faaF3fewlkIMtRWxlHye.jpg',
-    name: 'Ocean Foam (ambientCG 1K)'
-  }
+    id: "foam_ocean",
+    url: "https://t3.ftcdn.net/jpg/02/03/50/32/360_F_203503200_3M3ZmpW9nhU6faaF3fewlkIMtRWxlHye.jpg",
+    name: "Ocean Foam (ambientCG 1K)",
+  },
 ];
 
 // Detect if device likely has front/back cameras (mobile/tablet)
 const hasMultipleCameras = (): boolean => {
   // Check for touch capability (mobile/tablet indicator)
-  const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 
   // Check for mobile user agent patterns
-  const mobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const mobileUserAgent =
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    );
 
   // Assume device has multiple cameras if it's touch-enabled or mobile UA
   return hasTouch || mobileUserAgent;
 };
 
 export default function Capture() {
-  const [cameraType, setCameraType] = useState<'user' | 'environment' | null>(null);
+  const [cameraType, setCameraType] = useState<"user" | "environment" | null>(
+    null
+  );
   const [setupComplete, setSetupComplete] = useState(false);
   const [loading, setLoading] = useState(false);
   const [streamId, setStreamId] = useState<string | null>(null);
@@ -157,7 +173,7 @@ export default function Capture() {
   const [autoStartChecked, setAutoStartChecked] = useState(false);
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
 
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState("");
   const [selectedTexture, setSelectedTexture] = useState<string | null>(null);
   const [textureWeight, setTextureWeight] = useState([0.5]);
   const [intensity, setIntensity] = useState([5]);
@@ -170,7 +186,7 @@ export default function Capture() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showSlowLoadingMessage, setShowSlowLoadingMessage] = useState(false);
   const [uploadingClip, setUploadingClip] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<string>('');
+  const [uploadProgress, setUploadProgress] = useState<string>("");
   const [lastDisplayedProgress, setLastDisplayedProgress] = useState<number>(0);
   const [micEnabled, setMicEnabled] = useState(false);
   const [micPermissionDenied, setMicPermissionDenied] = useState(false);
@@ -187,29 +203,36 @@ export default function Capture() {
   const isMobile = useIsMobile();
 
   const checkAuth = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) {
-      navigate('/login');
+      navigate("/login");
     }
   }, [navigate]);
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
 
-  const initializeStream = useCallback(async (_type: 'user' | 'environment', _initialPrompt: string) => {
-    // Simplified: streaming is handled by DaydreamCanvas; just show loading until onReady
-    setLoading(true);
-  }, []);
+  const initializeStream = useCallback(
+    async (_type: "user" | "environment", _initialPrompt: string) => {
+      // Simplified: streaming is handled by DaydreamCanvas; just show loading until onReady
+      setLoading(true);
+    },
+    []
+  );
 
   // We use a separate state to track if we should show camera selection
   // Only show camera selection screen if there are actually multiple cameras
-  const [showCameraSelection, setShowCameraSelection] = useState(hasMultipleCameras());
+  const [showCameraSelection, setShowCameraSelection] = useState(
+    hasMultipleCameras()
+  );
 
-  const selectCamera = useCallback(async (type: 'user' | 'environment') => {
+  const selectCamera = useCallback(async (type: "user" | "environment") => {
     setCameraType(type);
     setShowCameraSelection(false); // Hide camera selection screen
     // Don't set initial prompt - let user configure it
-    setPrompt('');
+    setPrompt("");
     // Don't start stream yet - wait for user to configure params and hit "Start"
   }, []);
 
@@ -219,7 +242,7 @@ export default function Capture() {
     // If prompt is still empty, randomize it
     let finalPrompt = prompt;
     if (!finalPrompt.trim()) {
-      const prompts = cameraType === 'user' ? FRONT_PROMPTS : BACK_PROMPTS;
+      const prompts = cameraType === "user" ? FRONT_PROMPTS : BACK_PROMPTS;
       finalPrompt = prompts[Math.floor(Math.random() * prompts.length)];
       setPrompt(finalPrompt);
     }
@@ -235,7 +258,7 @@ export default function Capture() {
       if (shouldAutoStart) {
         setAutoStartChecked(true);
         // Desktop device - auto-start with default camera
-        selectCamera('user');
+        selectCamera("user");
       } else {
         setAutoStartChecked(true);
       }
@@ -251,7 +274,10 @@ export default function Capture() {
 
   // Params are passed directly to DaydreamCanvas (serial updates handled internally)
 
-  const calculateTIndexList = (intensity: number, quality: number): number[] => {
+  const calculateTIndexList = (
+    intensity: number,
+    quality: number
+  ): number[] => {
     let t_index_list: number[];
 
     // quality determines the number of indexes in the t_index_list and adds a constant to each index
@@ -259,24 +285,24 @@ export default function Capture() {
     if (quality < 0.25) {
       t_index_list = [6];
       qualityExtra = quality * 24;
-    } else if (quality < 0.50) {
+    } else if (quality < 0.5) {
       t_index_list = [6, 12];
       qualityExtra = (quality - 0.25) * 24;
     } else if (quality < 0.75) {
       t_index_list = [6, 12, 18];
-      qualityExtra = (quality - 0.50) * 24;
+      qualityExtra = (quality - 0.5) * 24;
     } else {
       t_index_list = [6, 12, 18, 24];
       qualityExtra = (quality - 0.75) * 24;
     }
-    t_index_list = t_index_list.map(v => v + qualityExtra);
+    t_index_list = t_index_list.map((v) => v + qualityExtra);
 
     // intensity scales the values, higher intensity -> lower values
     const intensityScale = 2.32 - 0.132 * intensity;
-    t_index_list = t_index_list.map(v => v * intensityScale);
+    t_index_list = t_index_list.map((v) => v * intensityScale);
 
     // clamp and round the values
-    return t_index_list.map(v => Math.max(0, Math.min(49, Math.round(v))));
+    return t_index_list.map((v) => Math.max(0, Math.min(49, Math.round(v))));
   };
 
   const startRecording = async () => {
@@ -294,16 +320,17 @@ export default function Capture() {
 
       // Auto-stop at 10 seconds
       autoStopTimerRef.current = setTimeout(() => {
-        stopRecording().catch(err => {
-          console.error('Error in auto-stop:', err);
+        stopRecording().catch((err) => {
+          console.error("Error in auto-stop:", err);
         });
       }, 10000);
     } catch (error) {
-      console.error('Error starting recording:', error);
+      console.error("Error starting recording:", error);
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to start recording',
-        variant: 'destructive',
+        title: "Error",
+        description:
+          error instanceof Error ? error.message : "Failed to start recording",
+        variant: "destructive",
       });
     }
   };
@@ -338,13 +365,13 @@ export default function Capture() {
       try {
         await studioRecorderRef.current?.stopRecording();
       } catch (error) {
-        console.error('Error stopping recorder:', error);
+        console.error("Error stopping recorder:", error);
       }
 
       toast({
-        title: 'Recording too short',
-        description: 'Hold for at least 3 seconds to create a clip',
-        variant: 'destructive',
+        title: "Recording too short",
+        description: "Hold for at least 3 seconds to create a clip",
+        variant: "destructive",
       });
       return;
     }
@@ -354,11 +381,11 @@ export default function Capture() {
     setUploadingClip(true);
     setLastDisplayedProgress(0); // Reset progress tracking
 
-    console.log('Recording stopped, processing via StudioRecorder...');
+    console.log("Recording stopped, processing via StudioRecorder...");
 
     toast({
-      title: 'Processing...',
-      description: 'Uploading your clip to Livepeer Studio',
+      title: "Processing...",
+      description: "Uploading your clip to Livepeer Studio",
     });
 
     // Stop recording - StudioRecorder will handle upload and call our callbacks
@@ -366,113 +393,152 @@ export default function Capture() {
   };
 
   // StudioRecorder callback: Handle upload progress
-  const handleRecordingProgress = useCallback((progress: { phase: string; step?: string; progress?: number }) => {
-    if (progress.phase === 'uploading' && progress.progress !== undefined) {
-      // Show upload progress with percentage (TUS only)
-      const uploadPercent = Math.round(progress.progress * 100);
-      setUploadProgress(`Uploading: ${uploadPercent}%`);
-    } else if (progress.phase === 'processing' && progress.progress !== undefined) {
-      // Smooth progression: use API value if greater, otherwise increment by 1%
-      setLastDisplayedProgress(prev => {
-        let newProgress = Math.round(progress.progress * 100);
-        newProgress = newProgress > prev ? newProgress : prev + 1;
-        newProgress = Math.min(99, newProgress); // Cap at 99% while processing
-        setUploadProgress(`Processing: ${newProgress}%`);
-        return newProgress;
-      });
-    } else {
-      setUploadProgress(progress.step || progress.phase);
-    }
-  }, [setUploadProgress, setLastDisplayedProgress]);
+  const handleRecordingProgress = useCallback(
+    (progress: { phase: string; step?: string; progress?: number }) => {
+      if (progress.phase === "uploading" && progress.progress !== undefined) {
+        // Show upload progress with percentage (TUS only)
+        const uploadPercent = Math.round(progress.progress * 100);
+        setUploadProgress(`Uploading: ${uploadPercent}%`);
+      } else if (
+        progress.phase === "processing" &&
+        progress.progress !== undefined
+      ) {
+        // Smooth progression: use API value if greater, otherwise increment by 1%
+        setLastDisplayedProgress((prev) => {
+          let newProgress = Math.round(progress.progress * 100);
+          newProgress = newProgress > prev ? newProgress : prev + 1;
+          newProgress = Math.min(99, newProgress); // Cap at 99% while processing
+          setUploadProgress(`Processing: ${newProgress}%`);
+          return newProgress;
+        });
+      } else {
+        setUploadProgress(progress.step || progress.phase);
+      }
+    },
+    [setUploadProgress, setLastDisplayedProgress]
+  );
 
   // StudioRecorder callback: Handle recording completion
-  const handleRecordingComplete = useCallback(async (result: { assetId: string; playbackId: string; downloadUrl?: string; durationMs: number }) => {
-    try {
-      console.log('Recording complete, saving to database...', result);
+  const handleRecordingComplete = useCallback(
+    async (result: {
+      assetId: string;
+      playbackId: string;
+      downloadUrl?: string;
+      durationMs: number;
+    }) => {
+      try {
+        console.log("Recording complete, saving to database...", result);
 
-      // Get session ID
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('sessions')
-        .select('id')
-        .eq('stream_id', streamId)
-        .single();
+        // Get session ID
+        const { data: sessionData, error: sessionError } = await supabase
+          .from("sessions")
+          .select("id")
+          .eq("stream_id", streamId)
+          .single();
 
-      if (sessionError) {
-        console.error('Session query error:', sessionError, { streamId });
-        throw new Error(`Session not found: ${sessionError.message}`);
+        if (sessionError) {
+          console.error("Session query error:", sessionError, { streamId });
+          throw new Error(`Session not found: ${sessionError.message}`);
+        }
+
+        if (!sessionData) {
+          throw new Error("Session not found");
+        }
+
+        // Save to database (clamp duration to valid range: 3-10s)
+        const clampedDuration = Math.min(
+          Math.max(result.durationMs, 3000),
+          10000
+        );
+        if (clampedDuration !== result.durationMs) {
+          console.log(
+            `Duration clamped: ${result.durationMs}ms -> ${clampedDuration}ms`
+          );
+        }
+
+        const clip = await saveClipToDatabase({
+          assetId: result.assetId,
+          playbackId: result.playbackId,
+          downloadUrl: result.downloadUrl,
+          durationMs: clampedDuration,
+          sessionId: sessionData.id,
+          prompt,
+          textureId: selectedTexture,
+          textureWeight: selectedTexture ? textureWeight[0] : null,
+          tIndexList: calculateTIndexList(intensity[0], quality[0]),
+        });
+
+        toast({
+          title: "Clip created!",
+          description: "Redirecting to your clip...",
+        });
+
+        navigate(`/clip/${clip.id}`);
+      } catch (error: unknown) {
+        console.error("Error saving clip to database:", error);
+        toast({
+          title: "Error creating clip",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive",
+        });
+      } finally {
+        setUploadingClip(false);
+        setUploadProgress("");
+        setLastDisplayedProgress(0);
       }
-
-      if (!sessionData) {
-        throw new Error('Session not found');
-      }
-
-      // Save to database (clamp duration to valid range: 3-10s)
-      const clampedDuration = Math.min(Math.max(result.durationMs, 3000), 10000);
-      if (clampedDuration !== result.durationMs) {
-        console.log(`Duration clamped: ${result.durationMs}ms -> ${clampedDuration}ms`);
-      }
-
-      const clip = await saveClipToDatabase({
-        assetId: result.assetId,
-        playbackId: result.playbackId,
-        downloadUrl: result.downloadUrl,
-        durationMs: clampedDuration,
-        sessionId: sessionData.id,
-        prompt,
-        textureId: selectedTexture,
-        textureWeight: selectedTexture ? textureWeight[0] : null,
-        tIndexList: calculateTIndexList(intensity[0], quality[0]),
-      });
-
-      toast({
-        title: 'Clip created!',
-        description: 'Redirecting to your clip...',
-      });
-
-      navigate(`/clip/${clip.id}`);
-    } catch (error: unknown) {
-      console.error('Error saving clip to database:', error);
-      toast({
-        title: 'Error creating clip',
-        description: error instanceof Error ? error.message : String(error),
-        variant: 'destructive',
-      });
-    } finally {
-      setUploadingClip(false);
-      setUploadProgress('');
-      setLastDisplayedProgress(0);
-    }
-  }, [streamId, prompt, selectedTexture, textureWeight, intensity, quality, navigate, toast]);
+    },
+    [
+      streamId,
+      prompt,
+      selectedTexture,
+      textureWeight,
+      intensity,
+      quality,
+      navigate,
+      toast,
+    ]
+  );
 
   // StudioRecorder callback: Handle recording errors
-  const handleRecordingError = useCallback((error: Error) => {
-    console.error('Recording error:', error);
+  const handleRecordingError = useCallback(
+    (error: Error) => {
+      console.error("Recording error:", error);
 
-    // Check if it's a browser support error
-    if (error.message.includes('not supported')) {
-      setCaptureSupported(false);
-    }
+      // Check if it's a browser support error
+      if (error.message.includes("not supported")) {
+        setCaptureSupported(false);
+      }
 
-    setRecording(false);
-    setUploadingClip(false);
-    setUploadProgress('');
-    setLastDisplayedProgress(0);
-    recordStartTimeRef.current = null;
+      setRecording(false);
+      setUploadingClip(false);
+      setUploadProgress("");
+      setLastDisplayedProgress(0);
+      recordStartTimeRef.current = null;
 
-    toast({
-      title: 'Recording error',
-      description: error.message,
-      variant: 'destructive',
-    });
-  }, [setCaptureSupported, setRecording, setUploadingClip, setUploadProgress, setLastDisplayedProgress, recordStartTimeRef, toast]);
+      toast({
+        title: "Recording error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+    [
+      setCaptureSupported,
+      setRecording,
+      setUploadingClip,
+      setUploadProgress,
+      setLastDisplayedProgress,
+      recordStartTimeRef,
+      toast,
+    ]
+  );
 
   const src = useMemo(() => {
     if (!playbackUrl) return null;
     return [
       {
-        type: 'webrtc' as const,
+        type: "webrtc" as const,
         src: playbackUrl,
-        mime: 'video/h264' as const,
+        mime: "video/h264" as const,
         width: 512,
         height: 512,
       },
@@ -484,34 +550,34 @@ export default function Capture() {
     const tIndex = calculateTIndexList(intensity[0], quality[0]);
 
     // Use "passthrough" if prompt is empty (during setup phase)
-    const effectivePrompt = prompt.trim() || 'passthrough';
+    const effectivePrompt = prompt.trim() || "passthrough";
 
     const base: StreamDiffusionParams = {
-      model_id: 'stabilityai/sdxl-turbo',
+      model_id: "stabilityai/sdxl-turbo",
       prompt: effectivePrompt,
-      negative_prompt: 'blurry, low quality, flat, 2d, distorted',
+      negative_prompt: "blurry, low quality, flat, 2d, distorted",
       t_index_list: tIndex,
       seed: 42,
       num_inference_steps: 50,
       controlnets: [
         {
           enabled: true,
-          model_id: 'xinsir/controlnet-depth-sdxl-1.0',
-          preprocessor: 'depth_tensorrt',
+          model_id: "xinsir/controlnet-depth-sdxl-1.0",
+          preprocessor: "depth_tensorrt",
           preprocessor_params: {},
           conditioning_scale: 0.6,
         },
         {
           enabled: true,
-          model_id: 'xinsir/controlnet-canny-sdxl-1.0',
-          preprocessor: 'canny',
+          model_id: "xinsir/controlnet-canny-sdxl-1.0",
+          preprocessor: "canny",
           preprocessor_params: {},
           conditioning_scale: 0.3,
         },
         {
           enabled: true,
-          model_id: 'xinsir/controlnet-tile-sdxl-1.0',
-          preprocessor: 'feedback',
+          model_id: "xinsir/controlnet-tile-sdxl-1.0",
+          preprocessor: "feedback",
           preprocessor_params: {},
           conditioning_scale: 0.2,
         },
@@ -525,10 +591,10 @@ export default function Capture() {
         ...base,
         ip_adapter: {
           enabled: true,
-          type: 'regular',
+          type: "regular",
           scale: textureWeight[0],
-          weight_type: 'linear',
-          insightface_model_name: 'buffalo_l',
+          weight_type: "linear",
+          insightface_model_name: "buffalo_l",
         },
         ip_adapter_style_image_url: textureUrl,
       };
@@ -538,10 +604,10 @@ export default function Capture() {
       ...base,
       ip_adapter: {
         enabled: false,
-        type: 'regular',
+        type: "regular",
         scale: 0,
-        weight_type: 'linear',
-        insightface_model_name: 'buffalo_l',
+        weight_type: "linear",
+        insightface_model_name: "buffalo_l",
       },
     };
   }, [intensity, quality, prompt, selectedTexture, textureWeight]);
@@ -562,15 +628,15 @@ export default function Capture() {
   // Listen for video playback to enable recording
   useEffect(() => {
     if (playerContainerRef.current) {
-      const video = playerContainerRef.current.querySelector('video');
+      const video = playerContainerRef.current.querySelector("video");
       if (video) {
         const handlePlay = () => setIsPlaying(true);
         const handlePause = () => setIsPlaying(false);
         const handleWaiting = () => setIsPlaying(false);
 
-        video.addEventListener('playing', handlePlay);
-        video.addEventListener('pause', handlePause);
-        video.addEventListener('waiting', handleWaiting);
+        video.addEventListener("playing", handlePlay);
+        video.addEventListener("pause", handlePause);
+        video.addEventListener("waiting", handleWaiting);
 
         // Check initial state
         if (!video.paused && video.readyState >= 3) {
@@ -578,9 +644,9 @@ export default function Capture() {
         }
 
         return () => {
-          video.removeEventListener('playing', handlePlay);
-          video.removeEventListener('pause', handlePause);
-          video.removeEventListener('waiting', handleWaiting);
+          video.removeEventListener("playing", handlePlay);
+          video.removeEventListener("pause", handlePause);
+          video.removeEventListener("waiting", handleWaiting);
         };
       }
     }
@@ -601,8 +667,11 @@ export default function Capture() {
     const handleVisibilityChange = () => {
       // Detect actual mobile/tablet devices (not just screen size)
       // Check for touch capability and mobile user agent patterns
-      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      const mobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+      const mobileUserAgent =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        );
       const isActualMobileDevice = hasTouch || mobileUserAgent;
 
       // Only stop streams on actual mobile devices where tabs go to background
@@ -613,7 +682,7 @@ export default function Capture() {
 
       if (document.hidden) {
         // User left the tab - record the time and stop streams immediately
-        console.log('Tab hidden (mobile) - stopping media streams for privacy');
+        console.log("Tab hidden (mobile) - stopping media streams for privacy");
         tabHiddenTimeRef.current = Date.now();
         wasStreamActiveRef.current = !!playbackUrl; // Remember if we had an active stream
 
@@ -630,10 +699,10 @@ export default function Capture() {
 
           // If user was gone for more than 5 seconds, restart the stream
           if (timeAway > 5000 && cameraType) {
-            console.log('User was away >5s, restarting stream...');
+            console.log("User was away >5s, restarting stream...");
             toast({
-              title: 'Restarting stream',
-              description: 'Reconnecting your camera...',
+              title: "Restarting stream",
+              description: "Reconnecting your camera...",
             });
             // Restart the stream with the same camera type and current prompt
             initializeStream(cameraType, prompt);
@@ -646,10 +715,10 @@ export default function Capture() {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [cameraType, playbackUrl, prompt, initializeStream, toast]);
 
@@ -669,55 +738,62 @@ export default function Capture() {
     }
   }, [playbackUrl, isPlaying]);
 
-
-  const onDaydreamReady = useCallback(async ({ streamId: sid, playbackId: pid, playbackUrl: purl }) => {
-    setStreamId(sid);
-    setPlaybackId(pid);
-    setPlaybackUrl(purl || null);
-    setLoading(false);
-    // Ensure session exists
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: userData } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', user.id)
-      .single();
-    if (userData) {
-      // Map UI cameraType ('user'|'environment') to DB enum ('front'|'back')
-      const cameraDbType = cameraType === 'user' ? 'front' : 'back';
-      const { error: insertError } = await supabase.from('sessions').insert({
-        user_id: userData.id,
-        stream_id: sid,
-        playback_id: pid,
-        camera_type: cameraDbType,
-      });
-      if (insertError) {
-        console.error('Failed to insert session:', insertError, {
-          userId: userData.id,
-          streamId: sid,
-          playbackId: pid,
-          cameraType,
-          cameraDbType,
+  const onDaydreamReady = useCallback(
+    async ({ streamId: sid, playbackId: pid, playbackUrl: purl }) => {
+      setStreamId(sid);
+      setPlaybackId(pid);
+      setPlaybackUrl(purl || null);
+      setLoading(false);
+      // Ensure session exists
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: userData } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", user.id)
+        .single();
+      if (userData) {
+        // Map UI cameraType ('user'|'environment') to DB enum ('front'|'back')
+        const cameraDbType = cameraType === "user" ? "front" : "back";
+        const { error: insertError } = await supabase.from("sessions").insert({
+          user_id: userData.id,
+          stream_id: sid,
+          playback_id: pid,
+          camera_type: cameraDbType,
         });
+        if (insertError) {
+          console.error("Failed to insert session:", insertError, {
+            userId: userData.id,
+            streamId: sid,
+            playbackId: pid,
+            cameraType,
+            cameraDbType,
+          });
+        }
       }
-    }
-  }, [cameraType]);
+    },
+    [cameraType]
+  );
   // Rely on onReady + player events; no onStatus needed
-  const onDaydreamError = useCallback((e) => {
-    console.error('DaydreamCanvas error', e);
-    setLoading(false);
-  }, [setLoading]);
+  const onDaydreamError = useCallback(
+    (e) => {
+      console.error("DaydreamCanvas error", e);
+      setLoading(false);
+    },
+    [setLoading]
+  );
 
   // Determine video source based on setup state
   const videoSource = useMemo(() => {
     if (!cameraType) {
       // Pre-warming with blank video during camera selection and param setup
-      return { type: 'blank' as const };
+      return { type: "blank" as const };
     }
     // Switch to camera after "Start" is clicked
     return {
-      type: 'camera' as const,
+      type: "camera" as const,
       facingMode: cameraType,
       mirrorFront: true,
     };
@@ -735,10 +811,12 @@ export default function Capture() {
         <div className="max-w-md w-full text-center space-y-8">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-neutral-100 to-neutral-400 bg-clip-text text-transparent mb-2">
-              {showMultipleCameras ? 'Choose Camera' : 'Start Camera'}
+              {showMultipleCameras ? "Choose Camera" : "Start Camera"}
             </h1>
             <p className="text-neutral-400">
-              {showMultipleCameras ? 'Select which camera to use' : 'Start your webcam to begin'}
+              {showMultipleCameras
+                ? "Select which camera to use"
+                : "Start your webcam to begin"}
             </p>
           </div>
 
@@ -746,36 +824,44 @@ export default function Capture() {
             {showMultipleCameras ? (
               <>
                 <Button
-                  onClick={() => selectCamera('user')}
+                  onClick={() => selectCamera("user")}
                   className="w-full h-20 bg-neutral-900 border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 transition-all duration-200"
                   variant="outline"
                 >
                   <div className="flex items-center gap-4">
                     <Camera className="w-8 h-8 text-neutral-300" />
                     <div className="text-left">
-                      <div className="font-semibold text-neutral-100">Front Camera</div>
-                      <div className="text-sm text-neutral-400">Selfie mode</div>
+                      <div className="font-semibold text-neutral-100">
+                        Front Camera
+                      </div>
+                      <div className="text-sm text-neutral-400">
+                        Selfie mode
+                      </div>
                     </div>
                   </div>
                 </Button>
 
                 <Button
-                  onClick={() => selectCamera('environment')}
+                  onClick={() => selectCamera("environment")}
                   className="w-full h-20 bg-neutral-900 border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 transition-all duration-200"
                   variant="outline"
                 >
                   <div className="flex items-center gap-4">
                     <Camera className="w-8 h-8 text-neutral-300" />
                     <div className="text-left">
-                      <div className="font-semibold text-neutral-100">Back Camera</div>
-                      <div className="text-sm text-neutral-400">Environment mode</div>
+                      <div className="font-semibold text-neutral-100">
+                        Back Camera
+                      </div>
+                      <div className="text-sm text-neutral-400">
+                        Environment mode
+                      </div>
                     </div>
                   </div>
                 </Button>
               </>
             ) : (
               <Button
-                onClick={() => selectCamera('user')}
+                onClick={() => selectCamera("user")}
                 className="w-full h-20 bg-gradient-to-r from-primary to-accent text-white transition-all duration-200"
               >
                 <div className="flex items-center gap-4">
@@ -796,7 +882,6 @@ export default function Capture() {
   else if (!setupComplete) {
     content = (
       <div className="min-h-screen flex flex-col items-center justify-between p-6 bg-neutral-950 text-neutral-200">
-
         <div className="flex-1 flex flex-col items-center justify-center w-full max-w-md mx-auto space-y-4">
           <div className="text-center space-y-1">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-neutral-100 to-neutral-400 bg-clip-text text-transparent">
@@ -809,7 +894,9 @@ export default function Capture() {
 
           <div className="w-full bg-neutral-900 rounded-3xl p-5 border border-neutral-800 space-y-4 shadow-inner">
             <div>
-              <label className="text-sm font-medium mb-2 block text-neutral-300">Prompt</label>
+              <label className="text-sm font-medium mb-2 block text-neutral-300">
+                Prompt
+              </label>
               <div className="flex items-start gap-2">
                 <Textarea
                   value={prompt}
@@ -823,8 +910,10 @@ export default function Capture() {
                   variant="outline"
                   size="icon"
                   onClick={() => {
-                    const prompts = cameraType === 'user' ? FRONT_PROMPTS : BACK_PROMPTS;
-                    const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+                    const prompts =
+                      cameraType === "user" ? FRONT_PROMPTS : BACK_PROMPTS;
+                    const randomPrompt =
+                      prompts[Math.floor(Math.random() * prompts.length)];
                     setPrompt(randomPrompt);
                   }}
                   className="bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 shrink-0"
@@ -841,7 +930,10 @@ export default function Capture() {
               </label>
 
               <div className="flex items-center gap-4">
-                <Popover open={texturePopoverOpen} onOpenChange={setTexturePopoverOpen}>
+                <Popover
+                  open={texturePopoverOpen}
+                  onOpenChange={setTexturePopoverOpen}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -850,7 +942,10 @@ export default function Capture() {
                       {selectedTexture ? (
                         <>
                           <img
-                            src={TEXTURES.find((t) => t.id === selectedTexture)?.url}
+                            src={
+                              TEXTURES.find((t) => t.id === selectedTexture)
+                                ?.url
+                            }
                             alt="Selected texture"
                             className="w-8 h-8 object-cover rounded"
                           />
@@ -872,7 +967,9 @@ export default function Capture() {
                           setSelectedTexture(null);
                           setTexturePopoverOpen(false);
                         }}
-                        variant={selectedTexture === null ? "default" : "outline"}
+                        variant={
+                          selectedTexture === null ? "default" : "outline"
+                        }
                         className={`aspect-square ${
                           selectedTexture === null
                             ? "bg-neutral-800 text-neutral-100"
@@ -888,7 +985,11 @@ export default function Capture() {
                             setSelectedTexture(texture.id);
                             setTexturePopoverOpen(false);
                           }}
-                          variant={selectedTexture === texture.id ? "default" : "outline"}
+                          variant={
+                            selectedTexture === texture.id
+                              ? "default"
+                              : "outline"
+                          }
                           className={`aspect-square p-0 overflow-hidden ${
                             selectedTexture === texture.id
                               ? "ring-2 ring-neutral-400"
@@ -978,301 +1079,328 @@ export default function Capture() {
   return (
     <>
       {/* Secret streaming container - hidden during setup, visible after */}
-        <div
-          className={
-            setupComplete
-              ? "fixed inset-0 flex flex-col bg-neutral-950 text-neutral-200"
-              : "fixed top-0 left-0 w-1 h-1 opacity-0 pointer-events-none overflow-hidden"
-          }
-        >
-          {/* Video Section with Output Player */}
-      <div className="flex-shrink-0 px-4 pt-4 pb-3 bg-neutral-950">
-        <div className="relative w-full max-w-md mx-auto aspect-square bg-neutral-950 rounded-3xl overflow-hidden border border-neutral-900 shadow-lg">
-          <StudioRecorder
-            ref={studioRecorderRef}
-            onProgress={handleRecordingProgress}
-            onComplete={handleRecordingComplete}
-            onError={handleRecordingError}
-          >
-            {playbackUrl && src ? (
-              <div
-                ref={playerContainerRef}
-                className="player-container w-full h-full [&_[data-radix-aspect-ratio-wrapper]]:!h-full [&_[data-radix-aspect-ratio-wrapper]]:!pb-0"
-                style={{ width: '100%', height: '100%', position: 'relative' }}
-              >
-                <Player.Root
-                  src={src}
-                  autoPlay
-                  lowLatency="force"
+      <div
+        className={
+          setupComplete
+            ? "fixed inset-0 flex flex-col bg-neutral-950 text-neutral-200"
+            : "fixed top-0 left-0 w-1 h-1 opacity-0 pointer-events-none overflow-hidden"
+        }
+      >
+        {/* Video Section with Output Player */}
+        <div className="flex-shrink-0 px-4 pt-4 pb-3 bg-neutral-950">
+          <div className="relative w-full max-w-md mx-auto aspect-square bg-neutral-950 rounded-3xl overflow-hidden border border-neutral-900 shadow-lg">
+            <StudioRecorder
+              ref={studioRecorderRef}
+              onProgress={handleRecordingProgress}
+              onComplete={handleRecordingComplete}
+              onError={handleRecordingError}
+            >
+              {playbackUrl && src ? (
+                <div
+                  ref={playerContainerRef}
+                  className="player-container w-full h-full [&_[data-radix-aspect-ratio-wrapper]]:!h-full [&_[data-radix-aspect-ratio-wrapper]]:!pb-0"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    position: "relative",
+                  }}
                 >
-                  <Player.Container
-                    className="w-full h-full"
-                    style={{ width: '100%', height: '100%', position: 'relative' }}
-                  >
-                    <Player.Video
+                  <Player.Root src={src} autoPlay lowLatency="force">
+                    <Player.Container
                       className="w-full h-full"
                       style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover'
+                        width: "100%",
+                        height: "100%",
+                        position: "relative",
                       }}
-                    />
-                    <Player.LoadingIndicator>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-950/50 gap-4">
-                        <Loader2 className="w-12 h-12 animate-spin text-primary" />
-                        <p className="text-sm text-neutral-300 text-center px-4 min-h-[20px]">
-                          {showSlowLoadingMessage && "Hang tight! Stream loading can take up to 30 seconds..."}
-                        </p>
-                      </div>
-                    </Player.LoadingIndicator>
-                  </Player.Container>
-                </Player.Root>
-              </div>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Loader2 className="w-12 h-12 animate-spin text-neutral-400" />
-              </div>
-            )}
-          </StudioRecorder>
-
-          {/* DaydreamCanvas: camera input preview (PiP in bottom-right) */}
-          <div className="absolute bottom-3 right-3 w-20 h-20 rounded-2xl overflow-hidden border-2 border-white shadow-lg">
-            <DaydreamCanvas
-              size={512}
-              className="w-full h-full object-cover"
-              videoSource={videoSource}
-              audioSource={
-                micEnabled
-                  ? { type: 'microphone' }
-                  : { type: 'silent' }
-              }
-              params={canvasParams}
-              onReady={onDaydreamReady}
-              onError={onDaydreamError}
-            />
-          </div>
-
-          {/* Microphone Toggle Button */}
-          <div className="absolute bottom-3 left-3">
-            <Button
-              onClick={toggleMicrophone}
-              disabled={!playbackId}
-              size="icon"
-              variant={micEnabled ? "default" : "secondary"}
-              className={`w-12 h-12 rounded-full shadow-lg transition-all duration-200 ${
-                micEnabled
-                  ? 'bg-green-600 hover:bg-green-700 text-white'
-                  : micPermissionDenied
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200'
-              }`}
-              title={micEnabled ? 'Disable microphone' : micPermissionDenied ? 'Microphone access denied' : 'Enable microphone'}
-            >
-              {micEnabled ? (
-                <Mic className="w-5 h-5" />
+                    >
+                      <Player.Video
+                        className="w-full h-full"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                      <Player.LoadingIndicator>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-950/50 gap-4">
+                          <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                          <p className="text-sm text-neutral-300 text-center px-4 min-h-[20px]">
+                            {showSlowLoadingMessage &&
+                              "Hang tight! Stream loading can take up to 30 seconds..."}
+                          </p>
+                        </div>
+                      </Player.LoadingIndicator>
+                    </Player.Container>
+                  </Player.Root>
+                </div>
               ) : (
-                <MicOff className="w-5 h-5" />
+                <div className="w-full h-full flex items-center justify-center">
+                  <Loader2 className="w-12 h-12 animate-spin text-neutral-400" />
+                </div>
               )}
-            </Button>
+            </StudioRecorder>
+
+            {/* DaydreamCanvas: camera input preview (PiP in bottom-right) */}
+            <div className="absolute bottom-3 right-3 w-20 h-20 rounded-2xl overflow-hidden border-2 border-white shadow-lg">
+              <DaydreamCanvas
+                size={512}
+                className="w-full h-full object-cover"
+                videoSource={videoSource}
+                audioSource={
+                  micEnabled ? { type: "microphone" } : { type: "silent" }
+                }
+                params={canvasParams}
+                onReady={onDaydreamReady}
+                onError={onDaydreamError}
+              />
+            </div>
+
+            {/* Microphone Toggle Button */}
+            <div className="absolute bottom-3 left-3">
+              <Button
+                onClick={toggleMicrophone}
+                disabled={!playbackId}
+                size="icon"
+                variant={micEnabled ? "default" : "secondary"}
+                className={`w-12 h-12 rounded-full shadow-lg transition-all duration-200 ${
+                  micEnabled
+                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    : micPermissionDenied
+                    ? "bg-red-600 hover:bg-red-700 text-white"
+                    : "bg-neutral-800 hover:bg-neutral-700 text-neutral-200"
+                }`}
+                title={
+                  micEnabled
+                    ? "Disable microphone"
+                    : micPermissionDenied
+                    ? "Microphone access denied"
+                    : "Enable microphone"
+                }
+              >
+                {micEnabled ? (
+                  <Mic className="w-5 h-5" />
+                ) : (
+                  <MicOff className="w-5 h-5" />
+                )}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Scrollable Controls Section */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4 min-h-0">
-            <div className="max-w-md mx-auto space-y-4">
-          {/* Record Button */}
-          {!captureSupported && (
-            <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-3 text-sm text-yellow-200">
-              ⚠️ Video capture not supported on this browser. Recording is disabled.
-            </div>
-          )}
-          <Button
-            onClick={isMobile ? undefined : toggleRecording}
-            onPointerDown={isMobile ? startRecording : undefined}
-            onPointerUp={isMobile ? stopRecording : undefined}
-            onPointerLeave={isMobile ? stopRecording : undefined}
-            onContextMenu={(e) => e.preventDefault()}
-                disabled={uploadingClip || !playbackId || !captureSupported || !isPlaying}
-            className="w-full h-14 bg-gradient-to-r from-neutral-200 to-neutral-500 text-neutral-900 font-semibold rounded-2xl hover:from-neutral-300 hover:to-neutral-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed select-none touch-manipulation"
-            style={{
-              WebkitUserSelect: 'none',
-              WebkitTouchCallout: 'none',
-              userSelect: 'none',
-              touchAction: 'manipulation'
-            }}
-          >
-            {recording ? (
-              <span className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                Recording... ({(recordingTime / 1000).toFixed(1)}s)
-              </span>
-            ) : uploadingClip ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                {uploadProgress || 'Uploading clip...'}
-              </span>
-                ) : !isPlaying ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Starting stream...
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-neutral-900" />
-                {isMobile ? 'Hold to Brew' : 'Click to Start Brewing'}
-              </span>
-            )}
-          </Button>
-
-          {/* Controls */}
-          <div className="bg-neutral-950 rounded-3xl p-5 border border-neutral-800 space-y-4 shadow-inner">
-            <div>
-              <label className="text-sm font-medium mb-2 block text-neutral-300">Prompt</label>
-              <div className="flex items-start gap-2">
-                <Textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Describe your AI effect..."
-                  className="bg-neutral-950 border-neutral-800 focus:border-neutral-600 focus:ring-0 text-neutral-100 placeholder:text-neutral-500 min-h-[60px] resize-none"
-                  rows={2}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => {
-                    const prompts = !cameraType ? ["passthrough"] : (cameraType === 'user' ? FRONT_PROMPTS : BACK_PROMPTS);
-                    const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
-                    setPrompt(randomPrompt);
-                  }}
-                  className="bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 shrink-0"
-                  title="Random prompt"
-                >
-                  <RefreshCw className="h-4 w-4 text-neutral-300" />
-                </Button>
+        {/* Scrollable Controls Section */}
+        <div className="flex-1 overflow-y-auto px-4 pb-4 min-h-0">
+          <div className="max-w-md mx-auto space-y-4">
+            {/* Record Button */}
+            {!captureSupported && (
+              <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-3 text-sm text-yellow-200">
+                ⚠️ Video capture not supported on this browser. Recording is
+                disabled.
               </div>
-            </div>
+            )}
+            <Button
+              onClick={isMobile ? undefined : toggleRecording}
+              onPointerDown={isMobile ? startRecording : undefined}
+              onPointerUp={isMobile ? stopRecording : undefined}
+              onPointerLeave={isMobile ? stopRecording : undefined}
+              onContextMenu={(e) => e.preventDefault()}
+              disabled={
+                uploadingClip || !playbackId || !captureSupported || !isPlaying
+              }
+              className="w-full h-14 bg-gradient-to-r from-neutral-200 to-neutral-500 text-neutral-900 font-semibold rounded-2xl hover:from-neutral-300 hover:to-neutral-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed select-none touch-manipulation"
+              style={{
+                WebkitUserSelect: "none",
+                WebkitTouchCallout: "none",
+                userSelect: "none",
+                touchAction: "manipulation",
+              }}
+            >
+              {recording ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                  Recording... ({(recordingTime / 1000).toFixed(1)}s)
+                </span>
+              ) : uploadingClip ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  {uploadProgress || "Uploading clip..."}
+                </span>
+              ) : !isPlaying ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Starting stream...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-neutral-900" />
+                  {isMobile ? "Hold to Brew" : "Click to Start Brewing"}
+                </span>
+              )}
+            </Button>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block text-neutral-300">
-                Texture
-              </label>
+            {/* Controls */}
+            <div className="bg-neutral-950 rounded-3xl p-5 border border-neutral-800 space-y-4 shadow-inner">
+              <div>
+                <label className="text-sm font-medium mb-2 block text-neutral-300">
+                  Prompt
+                </label>
+                <div className="flex items-start gap-2">
+                  <Textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Describe your AI effect..."
+                    className="bg-neutral-950 border-neutral-800 focus:border-neutral-600 focus:ring-0 text-neutral-100 placeholder:text-neutral-500 min-h-[60px] resize-none"
+                    rows={2}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      const prompts = !cameraType
+                        ? ["passthrough"]
+                        : cameraType === "user"
+                        ? FRONT_PROMPTS
+                        : BACK_PROMPTS;
+                      const randomPrompt =
+                        prompts[Math.floor(Math.random() * prompts.length)];
+                      setPrompt(randomPrompt);
+                    }}
+                    className="bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 shrink-0"
+                    title="Random prompt"
+                  >
+                    <RefreshCw className="h-4 w-4 text-neutral-300" />
+                  </Button>
+                </div>
+              </div>
 
-              <div className="flex items-center gap-4">
-                <Popover open={texturePopoverOpen} onOpenChange={setTexturePopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="flex items-center gap-2 bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 !w-16 !h-16 rounded-full overflow-hidden px-0 py-0 w-full sm:w-auto"
-                    >
-                      {selectedTexture ? (
-                        <>
-                          <img
-                            src={TEXTURES.find((t) => t.id === selectedTexture)?.url}
-                            alt="Selected texture"
-                            className="w-8 h-8 object-cover rounded"
-                          />
-                        </>
+              <div>
+                <label className="text-sm font-medium mb-2 block text-neutral-300">
+                  Texture
+                </label>
+
+                <div className="flex items-center gap-4">
+                  <Popover
+                    open={texturePopoverOpen}
+                    onOpenChange={setTexturePopoverOpen}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="flex items-center gap-2 bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 !w-16 !h-16 rounded-full overflow-hidden px-0 py-0 w-full sm:w-auto"
+                      >
+                        {selectedTexture ? (
+                          <>
+                            <img
+                              src={
+                                TEXTURES.find((t) => t.id === selectedTexture)
+                                  ?.url
+                              }
+                              alt="Selected texture"
+                              className="w-8 h-8 object-cover rounded"
+                            />
+                          </>
                         ) : (
                           <ImageOff className="w-5 h-5 text-neutral-400" />
                         )}
-                    </Button>
-                  </PopoverTrigger>
-
-                  <PopoverContent
-                    align="start"
-                    sideOffset={8}
-                    className="w-[90vw] sm:w-80 bg-neutral-900 border border-neutral-800 rounded-2xl shadow-xl p-4"
-                  >
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                      <Button
-                        onClick={() => {
-                          setSelectedTexture(null);
-                          setTexturePopoverOpen(false);
-                        }}
-                            variant="outline"
-                            className="aspect-square p-0 overflow-hidden bg-neutral-950 border-neutral-800 hover:border-neutral-600"
-                      >
-                        <ImageOff className="w-5 h-5 text-neutral-400" />
                       </Button>
-                      {TEXTURES.map((texture) => (
+                    </PopoverTrigger>
+
+                    <PopoverContent
+                      align="start"
+                      sideOffset={8}
+                      className="w-[90vw] sm:w-80 bg-neutral-900 border border-neutral-800 rounded-2xl shadow-xl p-4"
+                    >
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                         <Button
-                          key={texture.id}
                           onClick={() => {
-                            setSelectedTexture(texture.id);
+                            setSelectedTexture(null);
                             setTexturePopoverOpen(false);
                           }}
-                              variant="outline"
-                              className="aspect-square p-0 overflow-hidden bg-neutral-950 border-neutral-800 hover:border-neutral-600"
+                          variant="outline"
+                          className="aspect-square p-0 overflow-hidden bg-neutral-950 border-neutral-800 hover:border-neutral-600"
                         >
-                          <img
-                            src={texture.url}
-                            alt={texture.name}
-                                className="w-full h-full object-cover"
-                          />
+                          <ImageOff className="w-5 h-5 text-neutral-400" />
                         </Button>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                        {TEXTURES.map((texture) => (
+                          <Button
+                            key={texture.id}
+                            onClick={() => {
+                              setSelectedTexture(texture.id);
+                              setTexturePopoverOpen(false);
+                            }}
+                            variant="outline"
+                            className="aspect-square p-0 overflow-hidden bg-neutral-950 border-neutral-800 hover:border-neutral-600"
+                          >
+                            <img
+                              src={texture.url}
+                              alt={texture.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </Button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
 
                   <div className="flex-1">
-                      <div className="text-xs text-neutral-400 mb-1.5">
-                        {selectedTexture
-                          ? TEXTURES.find((t) => t.id === selectedTexture)?.name
-                          : 'No texture'}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-neutral-500 whitespace-nowrap">Weight:</label>
-                    <Slider
-                      value={textureWeight}
-                      onValueChange={setTextureWeight}
-                      min={0}
-                      max={1}
-                      step={0.01}
-                          className="flex-1 accent-neutral-400"
-                          disabled={!selectedTexture}
-                    />
-                        <span className="text-xs text-neutral-400 w-10 text-right">
-                          {textureWeight[0].toFixed(2)}
-                        </span>
-                  </div>
+                    <div className="text-xs text-neutral-400 mb-1.5">
+                      {selectedTexture
+                        ? TEXTURES.find((t) => t.id === selectedTexture)?.name
+                        : "No texture"}
                     </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-neutral-500 whitespace-nowrap">
+                        Weight:
+                      </label>
+                      <Slider
+                        value={textureWeight}
+                        onValueChange={setTextureWeight}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        className="flex-1 accent-neutral-400"
+                        disabled={!selectedTexture}
+                      />
+                      <span className="text-xs text-neutral-400 w-10 text-right">
+                        {textureWeight[0].toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block text-neutral-300">
-                    Intensity: {intensity[0].toFixed(2)}
-              </label>
-              <Slider
-                value={intensity}
-                onValueChange={setIntensity}
-                    min={0}
-                max={10}
-                step={0.1}
-                    className="w-full accent-neutral-400 h-6"
-              />
-            </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block text-neutral-300">
+                  Intensity: {intensity[0].toFixed(2)}
+                </label>
+                <Slider
+                  value={intensity}
+                  onValueChange={setIntensity}
+                  min={0}
+                  max={10}
+                  step={0.1}
+                  className="w-full accent-neutral-400 h-6"
+                />
+              </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block text-neutral-300">
-                Quality: {quality[0].toFixed(2)}
-              </label>
-              <Slider
-                value={quality}
-                onValueChange={setQuality}
-                min={0}
-                max={1}
-                step={0.01}
-                    className="w-full accent-neutral-400 h-6"
-              />
+              <div>
+                <label className="text-sm font-medium mb-2 block text-neutral-300">
+                  Quality: {quality[0].toFixed(2)}
+                </label>
+                <Slider
+                  value={quality}
+                  onValueChange={setQuality}
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  className="w-full accent-neutral-400 h-6"
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
       {/* Main content (camera selection / setup screens) */}
       {content}
