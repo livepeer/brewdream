@@ -11,13 +11,55 @@ import {
   startWhipPublish,
 } from '@/lib/daydream';
 import type { StreamDiffusionParams } from '@/lib/daydream';
+import prompts from '@/components/prompts';
+
+// Default stream diffusion parameters
+const DEFAULT_STREAM_DIFFUSION_PARAMS = {
+  model_id: 'stabilityai/sdxl-turbo',
+  prompt: prompts.default[0],
+  negative_prompt: 'blurry, low quality, flat, 2d, distorted',
+  num_inference_steps: 50,
+  seed: 42,
+  t_index_list: [6, 12, 18],
+  controlnets: [
+    {
+      enabled: true,
+      model_id: 'xinsir/controlnet-depth-sdxl-1.0',
+      preprocessor: 'depth_tensorrt',
+      preprocessor_params: {},
+      conditioning_scale: 0.6,
+    },
+    {
+      enabled: true,
+      model_id: 'xinsir/controlnet-canny-sdxl-1.0',
+      preprocessor: 'canny',
+      preprocessor_params: {},
+      conditioning_scale: 0.3,
+    },
+    {
+      enabled: true,
+      model_id: 'xinsir/controlnet-tile-sdxl-1.0',
+      preprocessor: 'feedback',
+      preprocessor_params: {},
+      conditioning_scale: 0.2,
+    },
+  ],
+  ip_adapter: {
+    enabled: false,
+    type: 'regular' as const,
+    scale: 0,
+    weight_type: 'linear' as const,
+    insightface_model_name: 'buffalo_l' as const,
+  },
+};
 
 export interface DaydreamCanvasProps {
   className?: string;
   style?: React.CSSProperties;
   canvasRef?: React.Ref<HTMLCanvasElement>; // optional ref to the canvas element
 
-  params: StreamDiffusionParams;
+  // Stream diffusion params, defaults to an SDXL turbo model with a depth, canny, and tile controlnet
+  params?: StreamDiffusionParams;
   // Video frame source, defaults to blank if not provided
   videoSource?:
     | {
@@ -570,54 +612,12 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
       paramsInFlightRef.current = true;
       // Snapshot latest for eventual consistency; always include required defaults
       const latest = latestParamsRef.current || next;
-      // Ensure controlnets are always sent (use provided or defaults)
-      const defaultControlnets = [
-        {
-          enabled: true,
-          model_id: 'xinsir/controlnet-depth-sdxl-1.0',
-          preprocessor: 'depth_tensorrt',
-          preprocessor_params: {},
-          conditioning_scale: 0.6,
-        },
-        {
-          enabled: true,
-          model_id: 'xinsir/controlnet-canny-sdxl-1.0',
-          preprocessor: 'canny',
-          preprocessor_params: {},
-          conditioning_scale: 0.3,
-        },
-        {
-          enabled: true,
-          model_id: 'xinsir/controlnet-tile-sdxl-1.0',
-          preprocessor: 'feedback',
-          preprocessor_params: {},
-          conditioning_scale: 0.2,
-        },
-      ];
-      const mergedControlnets = (latest.controlnets && latest.controlnets.length ? latest.controlnets : defaultControlnets)
-        .map((cn) => ({ enabled: true, preprocessor_params: {}, ...cn }));
 
       const body = {
         streamId,
         params: {
-          model_id: latest.model_id || 'stabilityai/sdxl-turbo',
-          prompt: latest.prompt,
-          negative_prompt: latest.negative_prompt ?? 'blurry, low quality, flat, 2d, distorted',
-          num_inference_steps: latest.num_inference_steps ?? 50,
-          seed: latest.seed ?? 42,
-          t_index_list: latest.t_index_list ?? [6, 12, 18],
-          controlnets: mergedControlnets,
-          // Always include ip_adapter (disabled by default)
-          ip_adapter: latest.ip_adapter ?? {
-            enabled: false,
-            type: 'regular',
-            scale: 0,
-            weight_type: 'linear',
-            insightface_model_name: 'buffalo_l',
-          },
-          ...(latest.ip_adapter_style_image_url
-            ? { ip_adapter_style_image_url: latest.ip_adapter_style_image_url }
-            : {}),
+          ...DEFAULT_STREAM_DIFFUSION_PARAMS,
+          ...latest,
         },
       };
 
@@ -659,48 +659,8 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
 
         // Create stream with initial params FIRST
         const initialParams: StreamDiffusionParams = {
-          model_id: params.model_id || 'stabilityai/sdxl-turbo',
-          prompt: params.prompt,
-          negative_prompt: params.negative_prompt ?? 'blurry, low quality, flat, 2d, distorted',
-          num_inference_steps: params.num_inference_steps ?? 50,
-          seed: params.seed ?? 42,
-          t_index_list: params.t_index_list ?? [6, 12, 18],
-          controlnets:
-            params.controlnets && params.controlnets.length
-              ? params.controlnets.map((cn) => ({ enabled: true, preprocessor_params: {}, ...cn }))
-              : [
-                  {
-                    enabled: true,
-                    model_id: 'xinsir/controlnet-depth-sdxl-1.0',
-                    preprocessor: 'depth_tensorrt',
-                    preprocessor_params: {},
-                    conditioning_scale: 0.6,
-                  },
-                  {
-                    enabled: true,
-                    model_id: 'xinsir/controlnet-canny-sdxl-1.0',
-                    preprocessor: 'canny',
-                    preprocessor_params: {},
-                    conditioning_scale: 0.3,
-                  },
-                  {
-                    enabled: true,
-                    model_id: 'xinsir/controlnet-tile-sdxl-1.0',
-                    preprocessor: 'feedback',
-                    preprocessor_params: {},
-                    conditioning_scale: 0.2,
-                  },
-                ],
-          ip_adapter: params.ip_adapter ?? {
-            enabled: false,
-            type: 'regular',
-            scale: 0,
-            weight_type: 'linear',
-            insightface_model_name: 'buffalo_l',
-          },
-          ...(params.ip_adapter_style_image_url
-            ? { ip_adapter_style_image_url: params.ip_adapter_style_image_url }
-            : {}),
+          ...DEFAULT_STREAM_DIFFUSION_PARAMS,
+          ...(params || {}),
         };
 
         const streamData = await createDaydreamStream(initialParams);

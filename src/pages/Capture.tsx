@@ -5,21 +5,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Camera,
-  ImageOff,
   Loader2,
   Sparkles,
-  RefreshCw,
   Mic,
   MicOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Slider } from "@/components/ui/slider";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
 import * as Player from "@livepeer/react/player";
 import type { StreamDiffusionParams } from "@/lib/daydream";
 import { DaydreamCanvas } from "@/components/DaydreamCanvas";
@@ -28,124 +19,10 @@ import {
   type StudioRecorderHandle,
 } from "@/components/StudioRecorder";
 import { saveClipToDatabase } from "@/lib/recording";
-
-const FRONT_PROMPTS = [
-  "studio ghibli portrait, soft rim light",
-  "cyberpunk neon portrait 90s anime",
-  "watercolor ink portrait, loose brush",
-  "melting holographic portrait, liquid chrome",
-  "psychedelic kaleidoscope face, fractal patterns",
-  "glitch art portrait, RGB split, datamosh",
-  "cosmic deity portrait, galaxy skin, star eyes",
-  "retro VHS portrait, scan lines, 80s aesthetic",
-  "paper cutout collage portrait, layered colors",
-  "stained glass portrait, vivid shards",
-  "oil painting portrait, thick impasto brushstrokes",
-  "pixel art portrait, 8-bit retro gaming",
-  "neon wireframe portrait, tron grid",
-  "ukiyo-e woodblock print portrait, bold lines",
-  "art nouveau portrait, flowing organic lines, ornate border",
-  "charcoal sketch portrait, dramatic shadows, textured paper",
-  "pop art portrait, bold colors, ben-day dots, warhol style",
-  "renaissance oil painting portrait, chiaroscuro lighting",
-  "surrealist portrait, melting features, dali inspired",
-  "impressionist portrait, visible brushstrokes, monet style",
-  "geometric cubist portrait, fragmented planes, picasso style",
-  "art deco portrait, golden ratios, elegant symmetry",
-  "abstract expressionist portrait, bold gestural marks",
-  "gothic portrait, dark romanticism, dramatic lighting",
-  "minimalist line art portrait, continuous line drawing",
-  "baroque portrait, ornate details, dramatic composition",
-  "futuristic android portrait, chrome finish, LED accents",
-  "vintage tin type portrait, sepia tones, daguerreotype",
-  "fantasy crystal portrait, gemstone skin, ethereal glow",
-  "steampunk portrait, brass gears, victorian aesthetic",
-  "tribal mask portrait, bold patterns, ceremonial paint",
-  "graffiti street art portrait, spray paint drips, urban",
-  "cel-shaded anime portrait, bold outlines, flat colors",
-  "ethereal ghost portrait, translucent, wispy trails",
-];
-
-const BACK_PROMPTS = [
-  "vaporwave cityscape",
-  "film noir scene, grainy",
-  "isometric tech poster, bold shapes",
-  "surreal dreamscape, melting clocks, floating objects",
-  "synthwave sunset, retrowave grid, palm trees",
-  "abstract expressionism, bold paint splatters",
-  "underwater coral reef, bioluminescent creatures",
-  "cyberpunk rain-soaked alley, neon signs",
-  "mandala pattern landscape, sacred geometry",
-  "vintage comic book scene, ben-day dots, pop art",
-  "low poly geometric world, faceted 3D",
-  "infrared photography, false color landscape",
-  "street art graffiti wall, bold tags, spray paint",
-  "M.C. Escher impossible architecture, tessellations",
-  "aurora borealis sky, swirling northern lights",
-  "ancient temple ruins, overgrown jungle, mystical atmosphere",
-  "nebula space scene, swirling cosmic dust, stars",
-  "dystopian wasteland, post-apocalyptic, rusted metal",
-  "enchanted forest, glowing mushrooms, fairy lights",
-  "steampunk clockwork city, brass mechanisms, steam",
-  "crystal cave, glowing minerals, underground wonder",
-  "floating islands, waterfalls into clouds, fantasy realm",
-  "neon tokyo street, rain reflections, busy night",
-  "desert mirage, heat waves, surreal oasis",
-  "arctic ice palace, frozen architecture, blue tones",
-  "volcanic landscape, lava flows, dramatic fire glow",
-  "alien planet surface, strange flora, dual suns",
-  "medieval castle, fog, dramatic moonlight",
-  "carnival carousel, vintage lights, whimsical",
-  "zen garden, raked sand patterns, minimalist peace",
-  "art gallery, abstract paintings, modern interior",
-  "futuristic laboratory, holographic displays, sci-fi tech",
-  "enchanted library, floating books, magical atmosphere",
-  "cherry blossom garden, pink petals falling, serene",
-  "gothic cathedral interior, stained glass, divine rays",
-];
-
-const TEXTURES = [
-  {
-    id: "lava",
-    url: "https://t4.ftcdn.net/jpg/01/83/14/47/360_F_183144766_dbGaN37u6a4VCliXQ6wcarerpYmuLAto.jpg",
-    name: "Lava",
-  },
-  {
-    id: "galaxy_orion",
-    url: "https://science.nasa.gov/wp-content/uploads/2023/04/orion-nebula-xlarge_web-jpg.webp",
-    name: "Galaxy",
-  },
-  {
-    id: "dragon_scales",
-    url: "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_tiles/roof_tiles_diff_1k.jpg",
-    name: "Dragon Scales (Roof Tiles, PH 1K)",
-  },
-  {
-    id: "water_ripples",
-    url: "https://media.gettyimages.com/id/585332126/photo/rock-face.jpg?s=612x612&w=gi&k=20&c=bX6I0qs7hVDXs0ZUaqPUb1uLkLaZm-ASZxVd5TDXW-A=",
-    name: "Water Ripples (TextureLabs)",
-  },
-  {
-    id: "lightning",
-    url: "https://opengameart.org/sites/default/files/l1.png",
-    name: "Lightning Bolt (OGA PNG)",
-  },
-  {
-    id: "sand_dunes",
-    url: "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_sand/aerial_sand_diff_1k.jpg",
-    name: "Sand Dunes (PH 1K)",
-  },
-  {
-    id: "sand_dunes_2",
-    url: "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_beach_01/aerial_beach_01_diff_1k.jpg",
-    name: "Beach Ripples (PH 1K)",
-  },
-  {
-    id: "foam_ocean",
-    url: "https://t3.ftcdn.net/jpg/02/03/50/32/360_F_203503200_3M3ZmpW9nhU6faaF3fewlkIMtRWxlHye.jpg",
-    name: "Ocean Foam (ambientCG 1K)",
-  },
-];
+import {
+  DiffusionParams,
+  type BrewParams,
+} from "@/components/DiffusionParams";
 
 // Detect if device likely has front/back cameras (mobile/tablet)
 const hasMultipleCameras = (): boolean => {
@@ -173,12 +50,15 @@ export default function Capture() {
   const [autoStartChecked, setAutoStartChecked] = useState(false);
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
 
-  const [prompt, setPrompt] = useState("");
-  const [selectedTexture, setSelectedTexture] = useState<string | null>(null);
-  const [textureWeight, setTextureWeight] = useState([0.5]);
-  const [intensity, setIntensity] = useState([5]);
-  const [quality, setQuality] = useState([0.4]);
-  const [texturePopoverOpen, setTexturePopoverOpen] = useState(false);
+  // Diffusion parameters state
+  const [brewParams, setBrewParams] = useState<BrewParams>({
+    prompt: "",
+    texture: null,
+    textureWeight: 0.5,
+    intensity: 5,
+    quality: 0.4,
+  });
+  const [canvasParams, setCanvasParams] = useState<StreamDiffusionParams | null>(null);
 
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -201,6 +81,10 @@ export default function Capture() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+
+  const onParamsError = useCallback((err: Error) => {
+    toast({title: "Error", description: err.message, variant: "destructive"});
+  }, [toast]);
 
   const checkAuth = useCallback(async () => {
     const {
@@ -231,25 +115,31 @@ export default function Capture() {
   const selectCamera = useCallback(async (type: "user" | "environment") => {
     setCameraType(type);
     setShowCameraSelection(false); // Hide camera selection screen
-    // Don't set initial prompt - let user configure it
-    setPrompt("");
+    // Reset prompt for new camera
+    setBrewParams((prev) => ({ ...prev, prompt: "" }));
     // Don't start stream yet - wait for user to configure params and hit "Start"
   }, []);
 
   const startStream = useCallback(async () => {
-    if (!cameraType) return;
-
-    // If prompt is still empty, randomize it
-    let finalPrompt = prompt;
-    if (!finalPrompt.trim()) {
-      const prompts = cameraType === "user" ? FRONT_PROMPTS : BACK_PROMPTS;
-      finalPrompt = prompts[Math.floor(Math.random() * prompts.length)];
-      setPrompt(finalPrompt);
+    if (!cameraType) {
+      toast({
+        title: "Error",
+        description: "Please select a camera",
+        variant: "destructive",
+      });
+      return;
+    } else if (!brewParams.prompt.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a prompt",
+        variant: "destructive",
+      });
+      return;
     }
 
     setLoading(false); // Ensure loading is false BEFORE setting setupComplete
     setSetupComplete(true);
-  }, [cameraType, prompt]);
+  }, [cameraType, brewParams.prompt, toast]);
 
   // Auto-start camera on desktop (non-mobile devices)
   useEffect(() => {
@@ -270,39 +160,6 @@ export default function Capture() {
 
   const toggleMicrophone = () => {
     setMicEnabled(!micEnabled);
-  };
-
-  // Params are passed directly to DaydreamCanvas (serial updates handled internally)
-
-  const calculateTIndexList = (
-    intensity: number,
-    quality: number
-  ): number[] => {
-    let t_index_list: number[];
-
-    // quality determines the number of indexes in the t_index_list and adds a constant to each index
-    let qualityExtra: number;
-    if (quality < 0.25) {
-      t_index_list = [6];
-      qualityExtra = quality * 24;
-    } else if (quality < 0.5) {
-      t_index_list = [6, 12];
-      qualityExtra = (quality - 0.25) * 24;
-    } else if (quality < 0.75) {
-      t_index_list = [6, 12, 18];
-      qualityExtra = (quality - 0.5) * 24;
-    } else {
-      t_index_list = [6, 12, 18, 24];
-      qualityExtra = (quality - 0.75) * 24;
-    }
-    t_index_list = t_index_list.map((v) => v + qualityExtra);
-
-    // intensity scales the values, higher intensity -> lower values
-    const intensityScale = 2.32 - 0.132 * intensity;
-    t_index_list = t_index_list.map((v) => v * intensityScale);
-
-    // clamp and round the values
-    return t_index_list.map((v) => Math.max(0, Math.min(49, Math.round(v))));
   };
 
   const startRecording = async () => {
@@ -462,10 +319,10 @@ export default function Capture() {
           downloadUrl: result.downloadUrl,
           durationMs: clampedDuration,
           sessionId: sessionData.id,
-          prompt,
-          textureId: selectedTexture,
-          textureWeight: selectedTexture ? textureWeight[0] : null,
-          tIndexList: calculateTIndexList(intensity[0], quality[0]),
+          prompt: brewParams.prompt,
+          textureId: brewParams.texture,
+          textureWeight: brewParams.texture ? brewParams.textureWeight : null,
+          tIndexList: canvasParams?.t_index_list || [],
         });
 
         toast({
@@ -487,16 +344,7 @@ export default function Capture() {
         setLastDisplayedProgress(0);
       }
     },
-    [
-      streamId,
-      prompt,
-      selectedTexture,
-      textureWeight,
-      intensity,
-      quality,
-      navigate,
-      toast,
-    ]
+    [streamId, brewParams, canvasParams, navigate, toast]
   );
 
   // StudioRecorder callback: Handle recording errors
@@ -544,73 +392,6 @@ export default function Capture() {
       },
     ];
   }, [playbackUrl]);
-
-  // Keep DaydreamCanvas params in sync with UI state by changing props
-  const canvasParams: StreamDiffusionParams = useMemo(() => {
-    const tIndex = calculateTIndexList(intensity[0], quality[0]);
-
-    // Use "passthrough" if prompt is empty (during setup phase)
-    const effectivePrompt = prompt.trim() || "passthrough";
-
-    const base: StreamDiffusionParams = {
-      model_id: "stabilityai/sdxl-turbo",
-      prompt: effectivePrompt,
-      negative_prompt: "blurry, low quality, flat, 2d, distorted",
-      t_index_list: tIndex,
-      seed: 42,
-      num_inference_steps: 50,
-      controlnets: [
-        {
-          enabled: true,
-          model_id: "xinsir/controlnet-depth-sdxl-1.0",
-          preprocessor: "depth_tensorrt",
-          preprocessor_params: {},
-          conditioning_scale: 0.6,
-        },
-        {
-          enabled: true,
-          model_id: "xinsir/controlnet-canny-sdxl-1.0",
-          preprocessor: "canny",
-          preprocessor_params: {},
-          conditioning_scale: 0.3,
-        },
-        {
-          enabled: true,
-          model_id: "xinsir/controlnet-tile-sdxl-1.0",
-          preprocessor: "feedback",
-          preprocessor_params: {},
-          conditioning_scale: 0.2,
-        },
-      ],
-    };
-
-    // IP adapter is conditional based on texture selection
-    if (selectedTexture) {
-      const textureUrl = TEXTURES.find((t) => t.id === selectedTexture)?.url;
-      return {
-        ...base,
-        ip_adapter: {
-          enabled: true,
-          type: "regular",
-          scale: textureWeight[0],
-          weight_type: "linear",
-          insightface_model_name: "buffalo_l",
-        },
-        ip_adapter_style_image_url: textureUrl,
-      };
-    }
-
-    return {
-      ...base,
-      ip_adapter: {
-        enabled: false,
-        type: "regular",
-        scale: 0,
-        weight_type: "linear",
-        insightface_model_name: "buffalo_l",
-      },
-    };
-  }, [intensity, quality, prompt, selectedTexture, textureWeight]);
 
   // Update recording timer display
   useEffect(() => {
@@ -705,7 +486,7 @@ export default function Capture() {
               description: "Reconnecting your camera...",
             });
             // Restart the stream with the same camera type and current prompt
-            initializeStream(cameraType, prompt);
+            initializeStream(cameraType, brewParams.prompt);
           }
 
           // Reset the tracking variables
@@ -720,7 +501,7 @@ export default function Capture() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [cameraType, playbackUrl, prompt, initializeStream, toast]);
+  }, [cameraType, playbackUrl, brewParams.prompt, initializeStream, toast]);
 
   // Show reassuring message if stream takes longer than 10s to load
   useEffect(() => {
@@ -882,8 +663,8 @@ export default function Capture() {
   else if (!setupComplete) {
     content = (
       <div className="min-h-screen flex flex-col items-center justify-between p-6 bg-neutral-950 text-neutral-200">
-        <div className="flex-1 flex flex-col items-center justify-center w-full max-w-md mx-auto space-y-4">
-          <div className="text-center space-y-1">
+        <div className="flex-1 flex flex-col items-center justify-center w-full space-y-4">
+          <div className="text-center space-y-1 w-full">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-neutral-100 to-neutral-400 bg-clip-text text-transparent">
               Design Your Brew
             </h1>
@@ -892,166 +673,14 @@ export default function Capture() {
             </p>
           </div>
 
-          <div className="w-full bg-neutral-900 rounded-3xl p-5 border border-neutral-800 space-y-4 shadow-inner">
-            <div>
-              <label className="text-sm font-medium mb-2 block text-neutral-300">
-                Prompt
-              </label>
-              <div className="flex items-start gap-2">
-                <Textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Write your style or tap shuffle to surprise yourself →"
-                  className="bg-neutral-950 border-neutral-800 focus:border-neutral-600 focus:ring-0 text-neutral-100 placeholder:text-neutral-500 min-h-[60px] resize-none"
-                  rows={2}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => {
-                    const prompts =
-                      cameraType === "user" ? FRONT_PROMPTS : BACK_PROMPTS;
-                    const randomPrompt =
-                      prompts[Math.floor(Math.random() * prompts.length)];
-                    setPrompt(randomPrompt);
-                  }}
-                  className="bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 shrink-0"
-                  title="Random prompt"
-                >
-                  <RefreshCw className="h-4 w-4 text-neutral-300" />
-                </Button>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block text-neutral-300">
-                Texture
-              </label>
-
-              <div className="flex items-center gap-4">
-                <Popover
-                  open={texturePopoverOpen}
-                  onOpenChange={setTexturePopoverOpen}
-                >
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="flex items-center gap-2 bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 !w-16 !h-16 rounded-full overflow-hidden px-0 py-0 w-full sm:w-auto"
-                    >
-                      {selectedTexture ? (
-                        <>
-                          <img
-                            src={
-                              TEXTURES.find((t) => t.id === selectedTexture)
-                                ?.url
-                            }
-                            alt="Selected texture"
-                            className="w-8 h-8 object-cover rounded"
-                          />
-                        </>
-                      ) : (
-                        <ImageOff className="w-5 h-5 text-neutral-400" />
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-
-                  <PopoverContent
-                    align="start"
-                    sideOffset={8}
-                    className="w-[90vw] sm:w-80 bg-neutral-900 border border-neutral-800 rounded-2xl shadow-xl p-4"
-                  >
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                      <Button
-                        onClick={() => {
-                          setSelectedTexture(null);
-                          setTexturePopoverOpen(false);
-                        }}
-                        variant={
-                          selectedTexture === null ? "default" : "outline"
-                        }
-                        className={`aspect-square ${
-                          selectedTexture === null
-                            ? "bg-neutral-800 text-neutral-100"
-                            : "bg-neutral-950 border-neutral-800 hover:border-neutral-600"
-                        }`}
-                      >
-                        <ImageOff className="w-5 h-5 text-neutral-400" />
-                      </Button>
-                      {TEXTURES.map((texture) => (
-                        <Button
-                          key={texture.id}
-                          onClick={() => {
-                            setSelectedTexture(texture.id);
-                            setTexturePopoverOpen(false);
-                          }}
-                          variant={
-                            selectedTexture === texture.id
-                              ? "default"
-                              : "outline"
-                          }
-                          className={`aspect-square p-0 overflow-hidden ${
-                            selectedTexture === texture.id
-                              ? "ring-2 ring-neutral-400"
-                              : "border border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850"
-                          }`}
-                        >
-                          <img
-                            src={texture.url}
-                            alt={texture.name}
-                            className="w-full h-full object-cover rounded-lg"
-                          />
-                        </Button>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-
-                {selectedTexture && (
-                  <div className="flex-1">
-                    <label className="text-sm font-medium block mb-2 text-neutral-300">
-                      Strength: {textureWeight[0].toFixed(2)}
-                    </label>
-                    <Slider
-                      value={textureWeight}
-                      onValueChange={setTextureWeight}
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      className="w-full accent-neutral-400"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block text-neutral-300">
-                Intensity: {intensity[0].toFixed(1)}
-              </label>
-              <Slider
-                value={intensity}
-                onValueChange={setIntensity}
-                min={1}
-                max={10}
-                step={0.1}
-                className="w-full accent-neutral-400 h-6"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block text-neutral-300">
-                Quality: {quality[0].toFixed(2)}
-              </label>
-              <Slider
-                value={quality}
-                onValueChange={setQuality}
-                min={0}
-                max={1}
-                step={0.01}
-                className="w-full accent-neutral-400 h-6"
-              />
-            </div>
+          <div className="w-full">
+            <DiffusionParams
+              cameraType={cameraType}
+              brewParams={brewParams}
+              onBrewParamsChange={setBrewParams}
+              handleStreamDiffusionParams={setCanvasParams}
+              onError={onParamsError}
+            />
           </div>
         </div>
 
@@ -1059,7 +688,7 @@ export default function Capture() {
         <div className="w-full max-w-md mx-auto pt-4 border-t border-neutral-800">
           <Button
             onClick={startStream}
-            disabled={prompt.length < 3}
+            disabled={brewParams.prompt.length < 3}
             className="w-full h-16 bg-gradient-to-r from-neutral-200 to-neutral-500 text-neutral-900 font-semibold text-lg rounded-2xl hover:from-neutral-300 hover:to-neutral-600 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             <span className="flex items-center gap-3">
@@ -1239,165 +868,13 @@ export default function Capture() {
             </Button>
 
             {/* Controls */}
-            <div className="bg-neutral-950 rounded-3xl p-5 border border-neutral-800 space-y-4 shadow-inner">
-              <div>
-                <label className="text-sm font-medium mb-2 block text-neutral-300">
-                  Prompt
-                </label>
-                <div className="flex items-start gap-2">
-                  <Textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Describe your AI effect..."
-                    className="bg-neutral-950 border-neutral-800 focus:border-neutral-600 focus:ring-0 text-neutral-100 placeholder:text-neutral-500 min-h-[60px] resize-none"
-                    rows={2}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      const prompts = !cameraType
-                        ? ["passthrough"]
-                        : cameraType === "user"
-                        ? FRONT_PROMPTS
-                        : BACK_PROMPTS;
-                      const randomPrompt =
-                        prompts[Math.floor(Math.random() * prompts.length)];
-                      setPrompt(randomPrompt);
-                    }}
-                    className="bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 shrink-0"
-                    title="Random prompt"
-                  >
-                    <RefreshCw className="h-4 w-4 text-neutral-300" />
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-2 block text-neutral-300">
-                  Texture
-                </label>
-
-                <div className="flex items-center gap-4">
-                  <Popover
-                    open={texturePopoverOpen}
-                    onOpenChange={setTexturePopoverOpen}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="flex items-center gap-2 bg-neutral-950 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-850 !w-16 !h-16 rounded-full overflow-hidden px-0 py-0 w-full sm:w-auto"
-                      >
-                        {selectedTexture ? (
-                          <>
-                            <img
-                              src={
-                                TEXTURES.find((t) => t.id === selectedTexture)
-                                  ?.url
-                              }
-                              alt="Selected texture"
-                              className="w-8 h-8 object-cover rounded"
-                            />
-                          </>
-                        ) : (
-                          <ImageOff className="w-5 h-5 text-neutral-400" />
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-
-                    <PopoverContent
-                      align="start"
-                      sideOffset={8}
-                      className="w-[90vw] sm:w-80 bg-neutral-900 border border-neutral-800 rounded-2xl shadow-xl p-4"
-                    >
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                        <Button
-                          onClick={() => {
-                            setSelectedTexture(null);
-                            setTexturePopoverOpen(false);
-                          }}
-                          variant="outline"
-                          className="aspect-square p-0 overflow-hidden bg-neutral-950 border-neutral-800 hover:border-neutral-600"
-                        >
-                          <ImageOff className="w-5 h-5 text-neutral-400" />
-                        </Button>
-                        {TEXTURES.map((texture) => (
-                          <Button
-                            key={texture.id}
-                            onClick={() => {
-                              setSelectedTexture(texture.id);
-                              setTexturePopoverOpen(false);
-                            }}
-                            variant="outline"
-                            className="aspect-square p-0 overflow-hidden bg-neutral-950 border-neutral-800 hover:border-neutral-600"
-                          >
-                            <img
-                              src={texture.url}
-                              alt={texture.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </Button>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-
-                  <div className="flex-1">
-                    <div className="text-xs text-neutral-400 mb-1.5">
-                      {selectedTexture
-                        ? TEXTURES.find((t) => t.id === selectedTexture)?.name
-                        : "No texture"}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-neutral-500 whitespace-nowrap">
-                        Weight:
-                      </label>
-                      <Slider
-                        value={textureWeight}
-                        onValueChange={setTextureWeight}
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        className="flex-1 accent-neutral-400"
-                        disabled={!selectedTexture}
-                      />
-                      <span className="text-xs text-neutral-400 w-10 text-right">
-                        {textureWeight[0].toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-2 block text-neutral-300">
-                  Intensity: {intensity[0].toFixed(2)}
-                </label>
-                <Slider
-                  value={intensity}
-                  onValueChange={setIntensity}
-                  min={0}
-                  max={10}
-                  step={0.1}
-                  className="w-full accent-neutral-400 h-6"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium mb-2 block text-neutral-300">
-                  Quality: {quality[0].toFixed(2)}
-                </label>
-                <Slider
-                  value={quality}
-                  onValueChange={setQuality}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  className="w-full accent-neutral-400 h-6"
-                />
-              </div>
-            </div>
+            <DiffusionParams
+              cameraType={cameraType}
+              brewParams={brewParams}
+              onBrewParamsChange={setBrewParams}
+              handleStreamDiffusionParams={setCanvasParams}
+              onError={onParamsError}
+            />
           </div>
         </div>
       </div>
