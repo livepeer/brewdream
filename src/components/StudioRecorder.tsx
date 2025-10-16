@@ -18,6 +18,7 @@ export interface StudioRecorderProps {
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
+
   onRecordingStart?: () => void;
   onRecordingStop?: () => void;
   onProgress?: (progress: UploadProgress) => void;
