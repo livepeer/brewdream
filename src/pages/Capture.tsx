@@ -14,7 +14,6 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import * as Player from '@livepeer/react/player';
-import { getSrc } from '@livepeer/react/external';
 import type { StreamDiffusionParams } from '@/lib/daydream';
 import { DaydreamCanvas } from '@/components/DaydreamCanvas';
 import { StudioRecorder, type StudioRecorderHandle } from '@/components/StudioRecorder';
@@ -156,6 +155,7 @@ export default function Capture() {
   const [streamId, setStreamId] = useState<string | null>(null);
   const [playbackId, setPlaybackId] = useState<string | null>(null);
   const [autoStartChecked, setAutoStartChecked] = useState(false);
+  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
 
   const [prompt, setPrompt] = useState('');
   const [selectedTexture, setSelectedTexture] = useState<string | null>(null);
@@ -445,35 +445,15 @@ export default function Capture() {
   }, [setCaptureSupported, setRecording, setUploadingClip, setUploadProgress, setLastDisplayedProgress, recordStartTimeRef, toast]);
 
   const src = useMemo(() => {
-    if (!playbackId) {
-      return null;
-    }
-
-    // Try getSrc first (works for standard Livepeer playback IDs)
-    const result = getSrc(playbackId);
-
-    if (result && Array.isArray(result) && result.length > 0) {
-      return result;
-    }
-
-    // For Daydream streams, construct WebRTC source manually
-    // Daydream uses Livepeer infrastructure but may have different endpoints
-    const manualSrc = [
+    if (!playbackUrl) return null;
+    return [
       {
-        src: `https://livepeer.studio/webrtc/${playbackId}`,
+        src: playbackUrl,
         mime: 'video/h264' as const,
         type: 'webrtc' as const,
       },
-      {
-        src: `https://livepeer.studio/hls/${playbackId}/index.m3u8`,
-        mime: 'application/vnd.apple.mpegurl' as const,
-        type: 'hls' as const,
-      },
     ] as const;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return manualSrc as any;
-  }, [playbackId]);
+  }, [playbackUrl]);
 
   // DaydreamCanvas manages init/updates; no debounce here
 
@@ -579,7 +559,7 @@ export default function Capture() {
         };
       }
     }
-  }, [playbackId, src]);
+  }, [playbackUrl, src]);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -610,10 +590,11 @@ export default function Capture() {
         // User left the tab - record the time and stop streams immediately
         console.log('Tab hidden (mobile) - stopping media streams for privacy');
         tabHiddenTimeRef.current = Date.now();
-        wasStreamActiveRef.current = !!playbackId; // Remember if we had an active stream
+        wasStreamActiveRef.current = !!playbackUrl; // Remember if we had an active stream
 
         // Clear the playback and stream state to show loading when they return
         setPlaybackId(null);
+        setPlaybackUrl(null);
         setStreamId(null);
         setIsPlaying(false);
       } else {
@@ -645,11 +626,11 @@ export default function Capture() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [cameraType, playbackId, prompt, initializeStream, toast]);
+  }, [cameraType, playbackUrl, prompt, initializeStream, toast]);
 
   // Show reassuring message if stream takes longer than 10s to load
   useEffect(() => {
-    if (playbackId && !isPlaying) {
+    if (playbackUrl && !isPlaying) {
       const timer = setTimeout(() => {
         setShowSlowLoadingMessage(true);
       }, 15000);
@@ -661,12 +642,13 @@ export default function Capture() {
     } else {
       setShowSlowLoadingMessage(false);
     }
-  }, [playbackId, isPlaying]);
+  }, [playbackUrl, isPlaying]);
 
 
-  const onDaydreamReady = useCallback(async ({ streamId: sid, playbackId: pid }) => {
+  const onDaydreamReady = useCallback(async ({ streamId: sid, playbackId: pid, playbackUrl: purl }) => {
     setStreamId(sid);
     setPlaybackId(pid);
+    setPlaybackUrl(purl || null);
     setLoading(false);
     // Ensure session exists
     const { data: { user } } = await supabase.auth.getUser();
@@ -792,7 +774,7 @@ export default function Capture() {
             onComplete={handleRecordingComplete}
             onError={handleRecordingError}
           >
-            {playbackId && src ? (
+            {playbackUrl && src ? (
               <div
                 ref={playerContainerRef}
                 className="player-container w-full h-full [&_[data-radix-aspect-ratio-wrapper]]:!h-full [&_[data-radix-aspect-ratio-wrapper]]:!pb-0"

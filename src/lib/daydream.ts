@@ -71,7 +71,7 @@ export async function createDaydreamStream(initialParams?: StreamDiffusionParams
 export async function startWhipPublish(
   whipUrl: string,
   stream: MediaStream
-): Promise<RTCPeerConnection> {
+): Promise<{ pc: RTCPeerConnection; playbackUrl: string | null }> {
   const pc = new RTCPeerConnection({
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -125,6 +125,9 @@ export async function startWhipPublish(
     throw new Error(`WHIP publish failed: ${response.status} ${response.statusText}`);
   }
 
+  // Capture low-latency WebRTC playback URL from response headers
+  const playbackUrl = response.headers.get('livepeer-playback-url') || null;
+
   // Get answer SDP and set it
   const answerSdp = await response.text();
   await pc.setRemoteDescription({
@@ -132,7 +135,7 @@ export async function startWhipPublish(
     sdp: answerSdp,
   });
 
-  return pc;
+  return { pc, playbackUrl };
 }
 
 /**

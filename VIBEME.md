@@ -164,6 +164,8 @@ These are **non-negotiable** technical requirements:
 2. **WHIP Publishing** → Browser sends camera/mic to Daydream via WebRTC
 3. **AI Processing** → Daydream applies effects in real-time
 4. **Playback** → Livepeer Player shows output (WebRTC-only, low-latency)
+   - Playback URL is sourced from `livepeer-playback-url` header returned by the WHIP POST
+   - We ignore `playbackId` for in-app playback sources; it's still stored for clips/DB
 5. **Recording** → Capture rendered video, upload to Livepeer, save to DB
 6. **Gallery Display** → Direct MP4 playback using VOD CDN URL pattern
 
@@ -814,7 +816,7 @@ Avoid:
 - Email OTP auth (no X OAuth as per PRD optional clause)
 - Camera selector (front/back) with permission prompts
 - Live output (1:1 square) with PiP source preview via Livepeer Player SDK v4
-- Manual src construction for Daydream playback IDs
+- WebRTC playback uses header-provided URL (no HLS/getSrc)
 - Prompt, Texture+Weight, Intensity, Quality controls with debounced updates
 - Recording with `captureStream()` + `MediaRecorder` (3-10s duration enforcement)
 - Desktop (click toggle) vs Mobile (press & hold) recording mechanics
@@ -844,8 +846,8 @@ Avoid:
 - **Recording method**: Browser-side `captureStream()` + `MediaRecorder` instead of Livepeer Create Clip API
   - **Rationale**: More reliable across network conditions, captures exact rendered frames, works with WebRTC-only playback
   - **Trade-off**: Requires browser support for captureStream (widely supported in modern browsers)
-- **Playback src**: Manual src construction instead of using `getSrc()` helper
-  - **Rationale**: Daydream playback IDs not recognized by Livepeer's `getSrc()` utility
+- **Playback src**: Use `livepeer-playback-url` from WHIP response headers
+  - **Rationale**: Faster startup via MediaMTX; consistent low-latency WebRTC
 - **Recording mechanics**: Different behavior for desktop vs mobile
   - **Rationale**: Better UX - desktop users can multitask, mobile users get familiar "hold to record" pattern
 - **Camera mirroring**: Canvas-based stream manipulation before Daydream instead of CSS transforms

@@ -53,7 +53,7 @@ export interface DaydreamCanvasProps {
   // Lifecycle & behavior
   alwaysOn?: boolean; // keep alive in background on mobile (default false)
   // Events
-  onReady?: (info: { streamId: string; playbackId: string }) => void;
+  onReady?: (info: { streamId: string; playbackId: string; playbackUrl: string | null }) => void;
   onError?: (error: unknown) => void;
 }
 
@@ -140,6 +140,7 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
 
     const streamIdRef = useRef<string | null>(null);
     const playbackIdRef = useRef<string | null>(null);
+    const playbackUrlRef = useRef<string | null>(null);
     const readyForParamUpdatesRef = useRef<boolean>(false);
 
     // Internal status tracking (no external API)
@@ -768,12 +769,15 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
         const streamData = await createDaydreamStream(initialParams);
         streamIdRef.current = streamData.id;
         playbackIdRef.current = streamData.output_playback_id;
-        onReady?.({ streamId: streamData.id, playbackId: streamData.output_playback_id });
 
-        // Start WHIP publishing IMMEDIATELY - send whatever frames are available
+        // Immediately start WHIP publish (and capture playback URL from headers)
         const publishStream = await buildPublishStream();
-        const pc = await startWhipPublish(streamData.whip_url, publishStream);
+        const { pc, playbackUrl } = await startWhipPublish(streamData.whip_url, publishStream);
         pcRef.current = pc;
+        playbackUrlRef.current = playbackUrl;
+
+        // Notify caller once we have both IDs and playback URL
+        onReady?.({ streamId: streamData.id, playbackId: streamData.output_playback_id, playbackUrl: playbackUrlRef.current });
         // ready
 
         // NOW start the copy loop to populate the canvas with actual content
@@ -845,6 +849,7 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
       // Clear stream identifiers
       streamIdRef.current = null;
       playbackIdRef.current = null;
+      playbackUrlRef.current = null;
 
       // stopped
     }, [stopCopyLoop]);
