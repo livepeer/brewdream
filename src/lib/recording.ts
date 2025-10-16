@@ -197,7 +197,7 @@ export async function uploadToLivepeer(
   const file = new File([blob], filename, { type: blob.type });
 
   let uploaded = false;
-  if (uploadData?.tus?.url) {
+  if (uploadData.tusEndpoint) {
     // Use TUS resumable upload
     console.log('Starting TUS upload...', {
       size: blob.size,
