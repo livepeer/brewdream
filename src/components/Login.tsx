@@ -93,35 +93,20 @@ export function Login() {
       } = await supabase.auth.getSession();
       const currentUserId = session?.user?.id;
 
-      // Only pre-create user record if we have a current user ID (anonymous user upgrading)
-      // For new users, the record will be created after OTP verification
+      // Check if email already exists (for anonymous users upgrading)
       if (currentUserId) {
-        const { error: insertError } = await supabase.from("users").upsert(
-          {
-            id: currentUserId,
-            email,
-            email_verified: false,
-          },
-          { onConflict: "id", ignoreDuplicates: false },
-        );
-        if (insertError) {
-          console.warn("Failed to create user record:", insertError);
-          // Check if it's a duplicate email error
-          if (String(insertError?.message || "").includes("duplicate key") &&
-              String(insertError?.message || "").includes("email")) {
-            toast({
-              title: "Email already exists",
-              description: "This email is already registered. Please use a different email or try logging in.",
-              variant: "destructive"
-            });
-          } else {
-            toast({
-              title: "Error",
-              description: "Could not save user data. Please try again.",
-              variant: "destructive"
-            });
-          }
-          return;
+        const { data: existingUser } = await supabase
+          .from("users")
+          .select("id")
+          .eq("email", email)
+          .single();
+
+        if (existingUser) {
+          toast({
+            title: "Email already exists",
+            description: "There is another account with this email. You'll switch to that account with the magic link we just sent you.",
+            variant: "destructive"
+          });
         }
       }
 
