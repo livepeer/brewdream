@@ -161,33 +161,6 @@ CREATE POLICY "Users can delete their own likes" ON public.clip_likes
 -- Policy "Anyone can view likes" remains unchanged
 
 -- ============================================================================
--- VERIFICATION QUERIES (commented out - uncomment to test)
--- ============================================================================
-
--- Test 1: Verify users can only see their own data
--- SELECT * FROM public.users WHERE id != auth.uid(); -- Should return 0 rows
-
--- Test 2: Verify users can only create sessions for themselves
--- INSERT INTO public.sessions (user_id, stream_id, playback_id, camera_type)
--- VALUES ('00000000-0000-0000-0000-000000000000', 'test', 'test', 'front');
--- Should fail if user_id doesn't match auth.uid()
-
--- Test 3: Verify anyone can still view sessions (for clip ownership checks)
--- SELECT * FROM public.sessions; -- Should work (public read)
-
--- Test 4: Verify users can only create clips for their own sessions
--- Requires valid session_id owned by the user
-
--- Test 5: Verify users can only manage their own tickets
--- Requires valid session_id owned by the user
-
--- Test 6: Verify users can only create likes with their own user_id
--- INSERT INTO public.clip_likes (clip_id, user_id)
--- VALUES ('...', auth.uid()); -- Should work
--- INSERT INTO public.clip_likes (clip_id, user_id)
--- VALUES ('...', '00000000-0000-0000-0000-000000000000'); -- Should fail
-
--- ============================================================================
 -- COMMENTS
 -- ============================================================================
 
@@ -205,4 +178,3 @@ COMMENT ON POLICY "Authenticated users can insert likes" ON public.clip_likes IS
 
 COMMENT ON POLICY "Users can delete their own likes" ON public.clip_likes IS
   'Security fix: Users can only delete their own likes';
-
