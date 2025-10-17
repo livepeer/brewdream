@@ -45,7 +45,6 @@ export default function Capture() {
   );
   const [setupComplete, setSetupComplete] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [transitionPhase, setTransitionPhase] = useState<"idle" | "fading-out" | "fading-in">("idle");
   const [streamId, setStreamId] = useState<string | null>(null);
   const [playbackId, setPlaybackId] = useState<string | null>(null);
   const [autoStartChecked, setAutoStartChecked] = useState(false);
@@ -138,19 +137,8 @@ export default function Capture() {
       return;
     }
 
-    // Start fade-out animation
-    setTransitionPhase("fading-out");
-    
-    // Wait for fade-out to complete (500ms)
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Switch to streaming view and start fade-in
     setLoading(false); // Ensure loading is false BEFORE setting setupComplete
     setSetupComplete(true);
-    setTransitionPhase("fading-in");
-    
-    // Reset transition phase after fade-in completes (500ms)
-    setTimeout(() => setTransitionPhase("idle"), 500);
   }, [cameraType, brewParams.prompt, toast]);
 
   // Auto-start camera on desktop (non-mobile devices)
@@ -674,10 +662,7 @@ export default function Capture() {
   // Parameter setup screen - shown after camera selection but before stream starts
   else if (!setupComplete) {
     content = (
-      <div 
-        className="fixed inset-0 flex flex-col bg-neutral-950 text-neutral-200 transition-opacity duration-500"
-        style={{ opacity: transitionPhase === "fading-out" ? 0 : 1 }}
-      >
+      <div className="fixed inset-0 flex flex-col bg-neutral-950 text-neutral-200">
         {/* Header Section */}
         <div className="flex-shrink-0 px-6 pt-6 pb-4 text-center">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-neutral-100 to-neutral-400 bg-clip-text text-transparent">
@@ -730,10 +715,9 @@ export default function Capture() {
       <div
         className={
           setupComplete
-            ? "fixed inset-0 flex flex-col bg-neutral-950 text-neutral-200 transition-opacity duration-500"
+            ? "fixed inset-0 flex flex-col bg-neutral-950 text-neutral-200"
             : "fixed top-0 left-0 w-1 h-1 opacity-0 pointer-events-none overflow-hidden"
         }
-        style={setupComplete ? { opacity: transitionPhase === "fading-in" ? 1 : 0 } : undefined}
       >
         {/* Video Section with Output Player */}
         <div className="flex-shrink-0 px-4 pt-4 pb-3 bg-neutral-950">
