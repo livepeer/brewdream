@@ -45,9 +45,9 @@ export type Database = {
       }
       clips: {
         Row: {
-          asset_id: string
+          asset_id: string | null
           asset_playback_id: string
-          asset_ready: boolean
+          asset_ready: boolean | null
           asset_url: string | null
           created_at: string | null
           duration_ms: number
@@ -60,9 +60,9 @@ export type Database = {
           texture_weight: number | null
         }
         Insert: {
-          asset_id: string
+          asset_id?: string | null
           asset_playback_id: string
-          asset_ready?: boolean
+          asset_ready?: boolean | null
           asset_url?: string | null
           created_at?: string | null
           duration_ms: number
@@ -75,9 +75,9 @@ export type Database = {
           texture_weight?: number | null
         }
         Update: {
-          asset_id?: string
+          asset_id?: string | null
           asset_playback_id?: string
-          asset_ready?: boolean
+          asset_ready?: boolean | null
           asset_url?: string | null
           created_at?: string | null
           duration_ms?: number
@@ -170,21 +170,18 @@ export type Database = {
         Row: {
           created_at: string | null
           email: string | null
-          email_verified: boolean | null
           id: string
           twitter_handle: string | null
         }
         Insert: {
           created_at?: string | null
           email?: string | null
-          email_verified?: boolean | null
           id?: string
           twitter_handle?: string | null
         }
         Update: {
           created_at?: string | null
           email?: string | null
-          email_verified?: boolean | null
           id?: string
           twitter_handle?: string | null
         }
