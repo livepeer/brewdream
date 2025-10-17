@@ -52,7 +52,7 @@ export function VideoGlow({
   blend?: "screen" | "normal" | "plus-lighter";
 }) {
   const bgStyle = useCinematicVideoGradient(targetRef);
-  const hasGradient = bgStyle?.background !== undefined && !bgStyle.background.includes("#111");
+  const hasGradient = bgStyle?.background !== undefined && typeof bgStyle.background === 'string' && !bgStyle.background.includes("#111");
 
   return (
     <div
