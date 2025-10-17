@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo, RefObject } from 'react';
+import { useEffect, useState, useRef, useMemo, RefObject, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, useMotionValue, useTransform, PanInfo, animate } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,21 +22,17 @@ import { useCinematicVideoGradient } from '@/hooks/useCinematicVideoGradient';
 interface Clip {
   id: string;
   asset_playback_id: string;
+  asset_id?: string; // Backward compatibility as old clips don't have this
   prompt: string;
   duration_ms: number;
   created_at: string;
   session_id: string;
+  raw_uploaded_file_url?: string | null;
+  asset_ready: boolean;
   likes_count?: {
     count: number;
   }[];
 }
-
-interface Ticket {
-  id: string;
-  code: string;
-  redeemed: boolean;
-}
-
 
 export function VideoGlow({
   targetRef,
@@ -114,6 +110,9 @@ export default function ClipView() {
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [viewCount, setViewCount] = useState<number | null>(null);
   const [viewsLoading, setViewsLoading] = useState(true);
+  const [assetStatus, setAssetStatus] = useState<'processing' | 'ready' | 'error'>('processing');
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [assetError, setAssetError] = useState<string | null>(null);
   const { toast } = useToast();
   const coffeeCardRef = useRef<HTMLDivElement | null>(null);
   const swipeX = useMotionValue(0);
@@ -126,11 +125,17 @@ export default function ClipView() {
   );
 
   useEffect(() => {
-    loadClip();
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setIsAuthenticated(!!user);
+        setCurrentUserId(user?.id || null);
+      } catch (error) {
+        console.error('Error checking auth:', error);
+      }
+    };
     checkAuth();
-    loadViewership();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, []);
 
   const creationDateStr = useMemo(() => {
     if (!clip?.created_at) return '';
@@ -145,122 +150,209 @@ export default function ClipView() {
       : createdAt.toLocaleDateString();
   }, [clip?.created_at]);
 
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      setIsAuthenticated(!!user);
-      setCurrentUserId(user?.id || null);
-    } catch (error) {
-      console.error('Error checking auth:', error);
+  useEffect(() => {
+    if (!clip || assetStatus !== 'ready') return;
+
+    if (!clip.asset_playback_id) {
+      setViewCount(null);
+      return;
     }
-  };
 
-  const loadViewership = async () => {
-    try {
-      if (!id) return;
+    const loadViewership = async () => {
+      try {
+        setViewsLoading(true);
 
-      const { data: clipData } = await supabase
-        .from('clips')
-        .select('asset_playback_id')
-        .eq('id', id)
-        .single();
+        const { data, error } = await supabase.functions.invoke('get-viewership', {
+          body: { playbackId: clip.asset_playback_id },
+        });
 
-      if (!clipData?.asset_playback_id) return;
-
-      const { data, error } = await supabase.functions.invoke('get-viewership', {
-        body: { playbackId: clipData.asset_playback_id },
-      });
-
-      if (error) {
+        if (error) {
+          console.error('Error loading viewership:', error);
+          setViewCount(0);
+        } else {
+          setViewCount(data.viewCount || 0);
+        }
+      } catch (error) {
         console.error('Error loading viewership:', error);
         setViewCount(0);
-      } else {
-        setViewCount(data.viewCount || 0);
+      } finally {
+        setViewsLoading(false);
       }
-    } catch (error) {
-      console.error('Error loading viewership:', error);
-      setViewCount(0);
-    } finally {
-      setViewsLoading(false);
     }
-  };
+    loadViewership();
+  }, [clip, assetStatus]);
 
-  const loadClip = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('clips')
-        .select(`
-          *,
-          likes_count:clip_likes(count)
-        `)
-        .eq('id', id)
-        .single();
+  const fetchClip = useCallback(async (id: string) => {
+    const { data, error } = await supabase
+      .from('clips')
+      .select(`
+        *,
+        likes_count:clip_likes(count)
+      `)
+      .eq('id', id)
+      .single();
 
-      if (error) throw error;
-      setClip(data);
+    if (error) throw error;
 
-      // Extract likes count from the aggregated result
-      const count = data.likes_count?.[0]?.count || 0;
-      setLikesCount(count);
+    setClip(data);
 
-      // Check if user owns this clip and if they have a ticket
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: sessionData } = await supabase
-          .from('sessions')
-          .select('user_id, id')
-          .eq('id', data.session_id)
-          .single();
+    // Extract likes count from the aggregated result
+    const count = data.likes_count?.[0]?.count || 0;
+    setLikesCount(count);
 
-        if (sessionData) {
-          // Check ownership
-          const ownsClip = sessionData.user_id === user.id;
-          setIsOwner(ownsClip);
+    return data;
+  }, []);
 
-          // Only load ticket data if user owns the clip
-          if (ownsClip) {
-            const { data: ticketData } = await supabase
-              .from('tickets')
-              .select('code, redeemed')
-              .eq('session_id', sessionData.id)
-              .single();
+  useEffect(() => {
+    const loadClip = async () => {
+      try {
+        setLoading(true);
 
-            if (ticketData) {
-              setTicketCode(ticketData.code);
-              setIsRedeemed(ticketData.redeemed);
+        const clip = await fetchClip(id);
 
-              // Start 5-second lock timer only if ticket exists and not redeemed
-              if (!ticketData.redeemed) {
-                setIsSwipeLocked(true);
-                setTimeout(() => {
-                  setIsSwipeLocked(false);
-                }, 5000);
+        // Check if user owns this clip and if they have a ticket
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: sessionData } = await supabase
+            .from('sessions')
+            .select('user_id, id')
+            .eq('id', clip.session_id)
+            .single();
+
+          if (sessionData) {
+            // Check ownership
+            const ownsClip = sessionData.user_id === user.id;
+            setIsOwner(ownsClip);
+
+            // Only load ticket data if user owns the clip
+            if (ownsClip) {
+              const { data: ticketData } = await supabase
+                .from('tickets')
+                .select('code, redeemed')
+                .eq('session_id', sessionData.id)
+                .maybeSingle();
+
+              if (ticketData) {
+                setTicketCode(ticketData.code);
+                setIsRedeemed(ticketData.redeemed);
+
+                // Start 5-second lock timer only if ticket exists and not redeemed
+                if (!ticketData.redeemed) {
+                  setIsSwipeLocked(true);
+                  setTimeout(() => {
+                    setIsSwipeLocked(false);
+                  }, 5000);
+                }
               }
             }
           }
+
+          // Check if user has liked this clip
+          const { data: likeData } = await supabase
+            .from('clip_likes')
+            .select('id')
+            .eq('clip_id', clip.id)
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          setIsLiked(!!likeData);
+        }
+      } catch (error) {
+        console.error('Error loading clip:', error);
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to load clip',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadClip();
+  }, [id, toast, fetchClip]);
+
+  // Poll asset status when processing
+  useEffect(() => {
+    if (!clip) return;
+
+    // Backward-compat: no raw_uploaded_file_url means clip was created with full asset
+    if (clip.asset_ready || !clip.raw_uploaded_file_url) {
+      setAssetStatus('ready');
+      return;
+    }
+    setAssetStatus('processing');
+
+    console.log('Starting asset status polling for clip:', clip.id);
+    let progressCount = 0;
+
+    const pollAssetStatus = async () => {
+      try {
+        // Use asset_id if available, otherwise fall back to playback_id for backward compatibility
+        const assetId = clip.asset_id || clip.asset_playback_id;
+        const { data, error } = await supabase.functions.invoke('studio-asset-status', {
+          body: { assetId },
+        });
+
+        if (error) {
+          console.error('Error checking asset status:', error);
+          return;
         }
 
-        // Check if user has liked this clip
-        const { data: likeData } = await supabase
-          .from('clip_likes')
-          .select('id')
-          .eq('clip_id', data.id)
-          .eq('user_id', user.id)
-          .single();
+        const status = data?.status;
+        console.log('Asset status poll result:', status, data);
 
-        setIsLiked(!!likeData);
+        // Update progress (increment 1% per check, cap at 95%)
+        progressCount++;
+        setProcessingProgress(Math.min(progressCount, 95));
+
+        if (status === 'ready') {
+          console.log('Asset is ready! Updating database and UI...');
+
+          // Update clip in database to mark asset as ready
+          const { error: updateError } = await supabase
+            .from('clips')
+            .update({ asset_ready: true, download_url: data.downloadUrl })
+            .eq('id', clip.id);
+
+          if (updateError) {
+            console.error('Error updating asset_ready flag:', updateError);
+            return;
+          }
+          await fetchClip(clip.id);
+
+          setAssetStatus('ready');
+          setProcessingProgress(100);
+
+          toast({
+            title: 'Video ready!',
+            description: 'Your clip has finished processing',
+          });
+        } else if (status === 'failed' || status === 'deleted') {
+          console.error('Asset processing failed:', status, data);
+          setAssetStatus('error');
+          setAssetError(data?.error?.message || 'Asset processing failed');
+          setViewCount(null);
+
+          toast({
+            title: 'Processing failed',
+            description: data?.error?.message || 'Your clip could not be processed',
+            variant: 'destructive',
+          });
+        }
+      } catch (error) {
+        console.error('Error polling asset status:', error);
       }
-    } catch (error) {
-      console.error('Error loading clip:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to load clip',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    // Poll immediately and then every second
+    pollAssetStatus();
+    const interval = setInterval(pollAssetStatus, 1000);
+
+    return () => {
+      console.log('Stopping asset status polling');
+      clearInterval(interval);
+    };
+  }, [clip, toast, fetchClip]);
 
   const handleLike = async () => {
     if (!isAuthenticated || !currentUserId) {
@@ -526,15 +618,27 @@ export default function ClipView() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4 }}
             >
-              <PlayerWithControls
-                src={[{
-                  src: `https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls/${clip.asset_playback_id}/static512p0.mp4`,
-                  type: "video",
-                  mime: "video/mp4",
-                  width: 500,
-                  height: 500,
-                }]}
-              />
+              {assetStatus === 'processing' && clip.raw_uploaded_file_url ? (
+                // Raw video element for processing state
+                <video
+                  src={clip.raw_uploaded_file_url}
+                  controls
+                  autoPlay
+                  loop
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                // Existing PlayerWithControls for ready state
+                <PlayerWithControls
+                  src={[{
+                    src: `https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls/${clip.asset_playback_id}/static512p0.mp4`,
+                    type: "video",
+                    mime: "video/mp4",
+                    width: 500,
+                    height: 500,
+                  }]}
+                />
+              )}
             </motion.div>
           </div>
 
@@ -543,8 +647,8 @@ export default function ClipView() {
             className="
               relative z-20
               space-y-6 bg-neutral-950 p-8
-              lg:sticky lg:top-16              
-              lg:h-[calc(100dvh-64px)] 
+              lg:sticky lg:top-16
+              lg:h-[calc(100dvh-64px)]
               lg:overflow-y-auto
               rounded-t-3xl md:rounded-t-none
             "
@@ -559,8 +663,13 @@ export default function ClipView() {
               <h1 className="mb-3 text-3xl font-bold text-foreground">{clip.prompt}</h1>
               <p className="text-muted-foreground">
                 Duration: {(clip.duration_ms / 1000).toFixed(1)}s • Created: {creationDateStr}
-
               </p>
+              {assetStatus === 'error' && (
+                <p className="text-red-500 text-sm flex items-center gap-2 mt-2">
+                  <AlertCircle className="w-4 h-4" />
+                  Warning: Asset could not be created on Studio
+                </p>
+              )}
             </motion.div>
 
             {/* Actions */}
@@ -575,10 +684,22 @@ export default function ClipView() {
                 {likesCount}
               </Button>
 
-              <Button variant="outline" className="gap-2 bg-transparent">
-                <Eye className="h-5 w-5" />
-                {viewsLoading ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : viewCount}
-              </Button>
+              {assetStatus === 'processing' ? (
+                <Button variant="outline" className="gap-2 bg-transparent" disabled>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  {processingProgress}%
+                </Button>
+              ) : assetStatus === 'error' ? (
+                <Button variant="outline" className="gap-2 bg-transparent" disabled>
+                  <Eye className="h-5 w-5" />
+                  -
+                </Button>
+              ) : (
+                <Button variant="outline" className="gap-2 bg-transparent">
+                  <Eye className="h-5 w-5" />
+                  {viewsLoading ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : viewCount}
+                </Button>
+              )}
 
               <Button variant="outline" onClick={shareToTwitter} className="gap-2 bg-transparent">
                 <Share2 className="h-5 w-5" />
@@ -614,11 +735,11 @@ export default function ClipView() {
                         dragConstraints={{ left: 0, right: 0 }}
                         dragElastic={0.2}
                         onDragEnd={handleDragEnd}
-                        style={{ 
-                          x: swipeX, 
-                          opacity, 
-                          scale, 
-                          rotate, 
+                        style={{
+                          x: swipeX,
+                          opacity,
+                          scale,
+                          rotate,
                           y,
                           boxShadow: shadow,
                           transformStyle: "preserve-3d",
@@ -724,7 +845,7 @@ export default function ClipView() {
                         </Button>
                       </div>
 
-                
+
                     </motion.div>
                   ) : (
                     /* Generate Ticket Button */

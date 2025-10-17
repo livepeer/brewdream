@@ -45,36 +45,45 @@ export type Database = {
       }
       clips: {
         Row: {
+          asset_id: string
           asset_playback_id: string
+          asset_ready: boolean
           asset_url: string | null
           created_at: string | null
           duration_ms: number
           id: string
           prompt: string
+          raw_uploaded_file_url: string | null
           session_id: string
           t_index_list: number[] | null
           texture_id: string | null
           texture_weight: number | null
         }
         Insert: {
+          asset_id: string
           asset_playback_id: string
+          asset_ready?: boolean
           asset_url?: string | null
           created_at?: string | null
           duration_ms: number
           id?: string
           prompt: string
+          raw_uploaded_file_url?: string | null
           session_id: string
           t_index_list?: number[] | null
           texture_id?: string | null
           texture_weight?: number | null
         }
         Update: {
+          asset_id?: string
           asset_playback_id?: string
+          asset_ready?: boolean
           asset_url?: string | null
           created_at?: string | null
           duration_ms?: number
           id?: string
           prompt?: string
+          raw_uploaded_file_url?: string | null
           session_id?: string
           t_index_list?: number[] | null
           texture_id?: string | null

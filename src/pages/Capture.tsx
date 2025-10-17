@@ -17,8 +17,8 @@ import { DaydreamCanvas } from "@/components/DaydreamCanvas";
 import {
   StudioRecorder,
   type StudioRecorderHandle,
+  type StudioRecordingResult,
 } from "@/components/StudioRecorder";
-import { saveClipToDatabase } from "@/lib/recording";
 import {
   DiffusionParams,
   type BrewParams,
@@ -38,6 +38,42 @@ const hasMultipleCameras = (): boolean => {
   // Assume device has multiple cameras if it's touch-enabled or mobile UA
   return hasTouch || mobileUserAgent;
 };
+
+/**
+ * Save clip metadata to database
+ */
+async function saveClipToDatabase(params: {
+  assetId: string;
+  playbackId: string;
+  assetReady: boolean;
+  downloadUrl?: string;
+  rawUploadedFileUrl?: string;
+  durationMs: number;
+  sessionId: string;
+  prompt?: string;
+  textureId?: string | null;
+  textureWeight?: number | null;
+  tIndexList?: number[] | null;
+}): Promise<{ id: string; [key: string]: unknown }> {
+  const { data: clip, error } = await supabase.functions.invoke('save-clip', {
+    body: {
+      assetId: params.assetId,
+      playbackId: params.playbackId,
+      asset_ready: params.assetReady,
+      downloadUrl: params.downloadUrl,
+      raw_uploaded_file_url: params.rawUploadedFileUrl,
+      durationMs: params.durationMs,
+      session_id: params.sessionId,
+      prompt: params.prompt,
+      texture_id: params.textureId,
+      texture_weight: params.textureWeight,
+      t_index_list: params.tIndexList,
+    },
+  });
+
+  if (error) throw error;
+  return clip;
+}
 
 export default function Capture() {
   // Controls the main UI flow through the capture process:
@@ -108,6 +144,7 @@ export default function Capture() {
   const recordStartTimeRef = useRef<number | null>(null);
   const tabHiddenTimeRef = useRef<number | null>(null);
   const wasStreamActiveRef = useRef<boolean>(false);
+  const clipSavedRef = useRef<boolean>(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -192,6 +229,9 @@ export default function Capture() {
     }
 
     try {
+      // Reset clip saved flag for new recording
+      clipSavedRef.current = false;
+
       // Start recording via StudioRecorder
       await studioRecorderRef.current?.startRecording();
 
@@ -299,15 +339,14 @@ export default function Capture() {
   );
 
   // StudioRecorder callback: Handle recording completion
-  const handleRecordingComplete = useCallback(
-    async (result: {
-      assetId: string;
-      playbackId: string;
-      downloadUrl?: string;
-      durationMs: number;
-    }) => {
+  const saveRecordingToClip = useCallback(
+    async (result: StudioRecordingResult, complete: boolean) => {
       try {
-        console.log("Recording complete, saving to database...", result);
+        // Skip if we already saved the clip early (via progress callback)
+        if (clipSavedRef.current) {
+          console.log("Clip already saved in progress callback, skipping complete handler");
+          return;
+        }
 
         // Get session ID
         const { data: sessionData, error: sessionError } = await supabase
@@ -339,7 +378,10 @@ export default function Capture() {
         const clip = await saveClipToDatabase({
           assetId: result.assetId,
           playbackId: result.playbackId,
-          downloadUrl: result.downloadUrl,
+          // the 2 below are saved from clip page once the asset is ready: downloadUrl and assetReady
+          downloadUrl: complete ? result.downloadUrl : undefined,
+          assetReady: complete ? true : false,
+          rawUploadedFileUrl: result.rawUploadedFileUrl,
           durationMs: clampedDuration,
           sessionId: sessionData.id,
           prompt: brewParams.prompt,
@@ -347,6 +389,9 @@ export default function Capture() {
           textureWeight: brewParams.texture ? brewParams.textureWeight : null,
           tIndexList: canvasParams?.t_index_list || [],
         });
+
+        // Set flag to avoid double saving on uploadDone/complete
+        clipSavedRef.current = true;
 
         toast({
           title: "Clip created!",
@@ -368,6 +413,29 @@ export default function Capture() {
       }
     },
     [streamId, brewParams, canvasParams, navigate, toast]
+  );
+
+  const handleRecordingComplete = useCallback(
+    async (result: StudioRecordingResult) => {
+      console.log("Recording complete, saving to database...", result);
+      saveRecordingToClip(result, true);
+    },
+    [saveRecordingToClip]
+  );
+
+  // StudioRecorder callback: Handle upload completion and optimistically create clip
+  const handleUploadDone = useCallback(
+    async (result: StudioRecordingResult) => {
+      // Only save early if we have rawUploadedFileUrl
+      if (!result.rawUploadedFileUrl) {
+        console.log("No rawUploadedFileUrl, will wait for full completion");
+        return;
+      }
+
+      console.log("Upload complete, saving clip optimistically with raw URL:", result.rawUploadedFileUrl);
+      saveRecordingToClip(result, false);
+    },
+    [saveRecordingToClip]
   );
 
   // StudioRecorder callback: Handle recording errors
@@ -758,6 +826,7 @@ export default function Capture() {
             <StudioRecorder
               ref={studioRecorderRef}
               onProgress={handleRecordingProgress}
+              onUploadDone={handleUploadDone}
               onComplete={handleRecordingComplete}
               onError={handleRecordingError}
             >
