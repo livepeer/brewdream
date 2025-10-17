@@ -27,22 +27,18 @@ export const OtpEmail = ({
 }: OtpEmailProps) => (
   <Html>
     <Head />
-    <Preview>Click to sign in to Brewdream</Preview>
+    <Preview>Your Brewdream login code: {token}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>Sign in to Brewdream</Heading>
+        <Heading style={h1}>Your Login Code</Heading>
         <Text style={text}>
-          Click the button below to sign in to your account:
+          Enter this 6-digit code to sign in to Brewdream:
         </Text>
-        <Link
-          href={`${supabase_url}/auth/v1/verify?token=${token}&type=${email_action_type}&redirect_to=${redirect_to}`}
-          target="_blank"
-          style={button}
-        >
-          Sign in to Brewdream
-        </Link>
+        <div style={codeContainer}>
+          <Text style={code}>{token}</Text>
+        </div>
         <Text style={{ ...text, marginTop: '24px', color: '#ababab', fontSize: '12px' }}>
-          This link will expire in 1 hour. If you didn&apos;t request this email, you can safely ignore it.
+          This code will expire in 1 hour. If you didn&apos;t request this email, you can safely ignore it.
         </Text>
       </Container>
     </Body>
@@ -81,18 +77,22 @@ const text = {
   margin: '24px 0',
 }
 
-const button = {
+const codeContainer = {
+  margin: '32px 0',
+  textAlign: 'center' as const,
+}
+
+const code = {
   display: 'inline-block',
-  padding: '16px 32px',
-  backgroundColor: '#8B5CF6',
+  padding: '20px 40px',
+  backgroundColor: '#1a1a1a',
   color: '#ffffff',
   fontFamily:
-    "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif",
-  fontSize: '16px',
+    "'Courier New', monospace",
+  fontSize: '32px',
   fontWeight: 'bold',
-  textDecoration: 'none',
-  borderRadius: '8px',
-  marginTop: '16px',
-  marginBottom: '16px',
-  textAlign: 'center' as const,
+  letterSpacing: '8px',
+  borderRadius: '12px',
+  border: '2px solid #8B5CF6',
+  margin: '0',
 }
