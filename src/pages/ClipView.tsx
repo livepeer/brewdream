@@ -277,13 +277,13 @@ export default function ClipView() {
 
     // Backward-compat: no raw_uploaded_file_url means clip was created with full asset
     if (clip.asset_ready || !clip.raw_uploaded_file_url) {
+      setProcessingProgress(100);
       setAssetStatus('ready');
       return;
     }
     setAssetStatus('processing');
 
     console.log('Starting asset status polling for clip:', clip.id);
-    let progressCount = 0;
 
     const pollAssetStatus = async () => {
       try {
@@ -299,29 +299,34 @@ export default function ClipView() {
         }
 
         const status = data?.status;
-        console.log('Asset status poll result:', status, data);
-
-        // Update progress (increment 1% per check, cap at 95%)
-        progressCount++;
-        setProcessingProgress(Math.min(progressCount, 95));
-
-        if (status === 'ready') {
-          console.log('Asset is ready! Updating database and UI...');
-
-          // Update clip in database to mark asset as ready
-          const { error: updateError } = await supabase
-            .from('clips')
-            .update({ asset_ready: true, download_url: data.downloadUrl })
-            .eq('id', clip.id);
+        if (status === 'processing') {
+          // Update progress (match api progress; increment 1% per check; cap at 95%)
+          const apiProgress = 100 * (data?.progress || 0);
+          setProcessingProgress(curr => {
+            return Math.min(95, Math.max(curr + 1, apiProgress));
+          });
+        } else if (status === 'ready') {
+          const { error: updateError } = await supabase.functions.invoke(
+            'update-clip-asset-status',
+            {
+              body: {
+                clipId: clip.id,
+                assetReady: true,
+                assetUrl: data.downloadUrl,
+              },
+            }
+          );
 
           if (updateError) {
             console.error('Error updating asset_ready flag:', updateError);
             return;
           }
+          console.log('Successfully updated asset_ready flag');
+
           await fetchClip(clip.id);
 
-          setAssetStatus('ready');
           setProcessingProgress(100);
+          setAssetStatus('ready');
 
           toast({
             title: 'Video ready!',
@@ -684,17 +689,7 @@ export default function ClipView() {
                 {likesCount}
               </Button>
 
-              {assetStatus === 'processing' ? (
-                <Button variant="outline" className="gap-2 bg-transparent" disabled>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  {processingProgress}%
-                </Button>
-              ) : assetStatus === 'error' ? (
-                <Button variant="outline" className="gap-2 bg-transparent" disabled>
-                  <Eye className="h-5 w-5" />
-                  -
-                </Button>
-              ) : (
+              {assetStatus === 'ready' && (
                 <Button variant="outline" className="gap-2 bg-transparent">
                   <Eye className="h-5 w-5" />
                   {viewsLoading ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : viewCount}
@@ -705,9 +700,18 @@ export default function ClipView() {
                 <Share2 className="h-5 w-5" />
               </Button>
 
-              <Button variant="outline" onClick={handleDownload} className="gap-2 bg-transparent">
-                <Download className="h-5 w-5" />
-              </Button>
+              {assetStatus === 'ready' && (
+                <Button variant="outline" onClick={handleDownload} className="gap-2 bg-transparent">
+                  <Download className="h-5 w-5" />
+                </Button>
+              )}
+
+              {assetStatus === 'processing' && (
+                <Button variant="outline" className="gap-2 bg-transparent" disabled>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                  {processingProgress}%
+                </Button>
+              )}
             </motion.div>
             {/* Coffee Ticket Section */}
             <motion.div
