@@ -588,8 +588,8 @@ export default function Capture() {
     const showMultipleCameras = hasMultipleCameras();
 
     content = (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-neutral-950 text-neutral-200">
-        <div className="max-w-md w-full text-center space-y-8">
+      <div className="fixed inset-0 flex items-center justify-center p-6 bg-neutral-950 text-neutral-200">
+        <div className="max-w-md w-full text-center space-y-6">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-neutral-100 to-neutral-400 bg-clip-text text-transparent mb-2">
               {showMultipleCameras ? "Choose Camera" : "Start Camera"}
@@ -662,18 +662,20 @@ export default function Capture() {
   // Parameter setup screen - shown after camera selection but before stream starts
   else if (!setupComplete) {
     content = (
-      <div className="min-h-screen flex flex-col items-center justify-between p-6 bg-neutral-950 text-neutral-200">
-        <div className="flex-1 flex flex-col items-center justify-center w-full space-y-4">
-          <div className="text-center space-y-1 w-full">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-neutral-100 to-neutral-400 bg-clip-text text-transparent">
-              Design Your Brew
-            </h1>
-            <p className="text-sm text-neutral-400">
-              Choose your ingredients and start brewing
-            </p>
-          </div>
+      <div className="fixed inset-0 flex flex-col bg-neutral-950 text-neutral-200">
+        {/* Header Section */}
+        <div className="flex-shrink-0 px-6 pt-6 pb-4 text-center">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-neutral-100 to-neutral-400 bg-clip-text text-transparent">
+            Design Your Brew
+          </h1>
+          <p className="text-sm text-neutral-400 mt-1">
+            Choose your ingredients and start brewing
+          </p>
+        </div>
 
-          <div className="w-full">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-6 pb-4 min-h-0">
+          <div className="max-w-md mx-auto">
             <DiffusionParams
               cameraType={cameraType}
               brewParams={brewParams}
@@ -684,18 +686,20 @@ export default function Capture() {
           </div>
         </div>
 
-        {/* Start Button at Bottom */}
-        <div className="w-full max-w-md mx-auto pt-4 border-t border-neutral-800">
-          <Button
-            onClick={startStream}
-            disabled={brewParams.prompt.length < 3}
-            className="w-full h-16 bg-gradient-to-r from-neutral-200 to-neutral-500 text-neutral-900 font-semibold text-lg rounded-2xl hover:from-neutral-300 hover:to-neutral-600 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-          >
-            <span className="flex items-center gap-3">
-              <Sparkles className="w-6 h-6 text-neutral-900" />
-              Start
-            </span>
-          </Button>
+        {/* Fixed Start Button at Bottom */}
+        <div className="flex-shrink-0 px-6 py-4 border-t border-neutral-800 bg-neutral-950">
+          <div className="max-w-md mx-auto">
+            <Button
+              onClick={startStream}
+              disabled={brewParams.prompt.length < 3}
+              className="w-full h-16 bg-gradient-to-r from-neutral-200 to-neutral-500 text-neutral-900 font-semibold text-lg rounded-2xl hover:from-neutral-300 hover:to-neutral-600 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              <span className="flex items-center gap-3">
+                <Sparkles className="w-6 h-6 text-neutral-900" />
+                Start
+              </span>
+            </Button>
+          </div>
         </div>
       </div>
     );
