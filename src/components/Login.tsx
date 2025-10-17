@@ -104,6 +104,12 @@ export function Login() {
       );
       if (insertError && !String(insertError?.message || "").includes("duplicate")) {
         console.warn("Failed to create user record:", insertError);
+        toast({
+          title: "Error",
+          description: "Could not save user data. Please try again.",
+          variant: "destructive"
+        });
+        return;
       }
 
       if (isAnonymous && currentUserId) {
@@ -153,9 +159,18 @@ export function Login() {
         const userId = newSession?.user?.id;
         const userEmail = newSession?.user?.email;
         if (userId) {
-          await supabase
+          const { error: upsertError } = await supabase
             .from("users")
             .upsert({ id: userId, email: userEmail || email, email_verified: true }, { onConflict: "id" });
+          if (upsertError) {
+            console.error("Failed to update user record:", upsertError);
+            toast({
+              title: "Error",
+              description: "Email verified but couldn't save user data. Please try again.",
+              variant: "destructive"
+            });
+            return;
+          }
         }
 
         toast({
@@ -180,9 +195,18 @@ export function Login() {
         const userEmail = session?.user?.email || email;
 
         if (userId) {
-          await supabase
+          const { error: upsertError } = await supabase
             .from("users")
             .upsert({ id: userId, email: userEmail, email_verified: true }, { onConflict: "id" });
+          if (upsertError) {
+            console.error("Failed to update user record:", upsertError);
+            toast({
+              title: "Error",
+              description: "Logged in but couldn't save user data. Please try again.",
+              variant: "destructive"
+            });
+            return;
+          }
         }
 
         toast({
@@ -228,9 +252,18 @@ export function Login() {
       if (event === "SIGNED_IN" && session?.user) {
         const wasAnonymous = (session.user as any)?.is_anonymous || false;
         if (!wasAnonymous) {
-          await supabase
+          const { error: upsertError } = await supabase
             .from("users")
             .upsert({ id: session.user.id, email: session.user.email, email_verified: true }, { onConflict: "id" });
+          if (upsertError) {
+            console.error("Failed to save user data on auth change:", upsertError);
+            toast({
+              title: "Error",
+              description: "Logged in but couldn't save user data. Please try again.",
+              variant: "destructive"
+            });
+            return;
+          }
         }
         toast({
           title: "Success!",

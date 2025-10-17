@@ -621,32 +621,28 @@ export default function Capture() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id")
-        .eq("id", user.id)
-        .single();
-      if (userData) {
-        // Map UI cameraType ('user'|'environment') to DB enum ('front'|'back')
-        const cameraDbType = cameraType === "user" ? "front" : "back";
-        const { error: insertError } = await supabase.from("sessions").insert({
-          user_id: userData.id,
-          stream_id: sid,
-          playback_id: pid,
-          camera_type: cameraDbType,
+
+      // Map UI cameraType ('user'|'environment') to DB enum ('front'|'back')
+      const sessionObj = {
+        user_id: user.id,
+        stream_id: sid,
+        playback_id: pid,
+        camera_type: cameraType === "user" ? "front" : "back",
+      };
+      const { error: insertError } = await supabase
+        .from("sessions")
+        .insert(sessionObj);
+
+      if (insertError) {
+        console.error("Failed to insert session:", insertError, sessionObj);
+        toast({
+          title: "Error creating session",
+          description: insertError.message,
+          variant: "destructive",
         });
-        if (insertError) {
-          console.error("Failed to insert session:", insertError, {
-            userId: userData.id,
-            streamId: sid,
-            playbackId: pid,
-            cameraType,
-            cameraDbType,
-          });
-        }
       }
     },
-    [cameraType]
+    [cameraType, toast]
   );
   // Rely on onReady + player events; no onStatus needed
   const onDaydreamError = useCallback(
