@@ -8,6 +8,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { RefreshCw, ImageOff } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { StreamDiffusionParams } from "@/lib/daydream";
 import prompts from "@/components/prompts";
 
@@ -105,6 +106,7 @@ export function DiffusionParams({
   onError,
 }: DiffusionParamsProps) {
   const [texturePopoverOpen, setTexturePopoverOpen] = useState(false);
+  const { toast } = useToast();
 
   // brewParams state is controlled by the parent component
   const prompt = brewParams.prompt;
@@ -162,7 +164,13 @@ export function DiffusionParams({
     if (textureId) {
       const textureUrl = TEXTURES.find((t) => t.id === textureId)?.url;
       if (!textureUrl) {
-        onError?.(new Error("Invalid texture ID"));
+        const error = new Error("Invalid texture ID");
+        onError?.(error);
+        toast({
+          title: "Invalid texture",
+          description: "The selected texture is no longer available",
+          variant: "destructive"
+        });
         return;
       }
       sdParams = {

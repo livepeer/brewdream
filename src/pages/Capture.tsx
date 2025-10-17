@@ -155,24 +155,45 @@ export default function Capture() {
   }, [toast]);
 
   const checkAuth = useCallback(async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
-      navigate("/login");
-      return;
-    }
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/login");
+        return;
+      }
 
-    const { data: userData } = await supabase
-      .from("users")
-      .select("email_verified")
-      .eq("id", session.user.id)
-      .single();
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("email_verified")
+        .eq("id", session.user.id)
+        .single();
 
-    if (!userData?.email_verified) {
+      if (userError) {
+        console.error("Error fetching user data:", userError);
+        toast({
+          title: "Authentication error",
+          description: "Please try logging in again",
+          variant: "destructive"
+        });
+        navigate("/login");
+        return;
+      }
+
+      if (!userData?.email_verified) {
+        navigate("/login");
+      }
+    } catch (error) {
+      console.error("Error checking authentication:", error);
+      toast({
+        title: "Authentication error",
+        description: "Please try logging in again",
+        variant: "destructive"
+      });
       navigate("/login");
     }
-  }, [navigate]);
+  }, [navigate, toast]);
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);

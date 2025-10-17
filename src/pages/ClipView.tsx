@@ -295,6 +295,11 @@ export default function ClipView() {
 
         if (error) {
           console.error('Error checking asset status:', error);
+          toast({
+            title: "Failed to check video status",
+            description: "Could not verify if your video is ready",
+            variant: "destructive"
+          });
           return;
         }
 
@@ -319,6 +324,11 @@ export default function ClipView() {
 
           if (updateError) {
             console.error('Error updating asset_ready flag:', updateError);
+            toast({
+              title: "Failed to update video status",
+              description: "Video is ready but couldn't save status",
+              variant: "destructive"
+            });
             return;
           }
           console.log('Successfully updated asset_ready flag');

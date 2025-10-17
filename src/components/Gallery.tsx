@@ -4,6 +4,7 @@ import { Header } from './Header';
 import { ClipCard } from './ClipCard';
 import { FloatingFAB } from './FloatingFAB';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
 interface Clip {
@@ -24,6 +25,7 @@ export function Gallery() {
   const [hasMore, setHasMore] = useState(true);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const { toast } = useToast();
 
   const PAGE_SIZE = isMobile ? 10 : 16;
 
@@ -75,6 +77,11 @@ export function Gallery() {
       setPage(1);
     } catch (error) {
       console.error('Error loading clips:', error);
+      toast({
+        title: "Failed to load clips",
+        description: "Please refresh the page to try again",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -112,6 +119,11 @@ export function Gallery() {
       setPage((prev) => prev + 1);
     } catch (error) {
       console.error('Error loading more clips:', error);
+      toast({
+        title: "Failed to load more clips",
+        description: "Please try again later",
+        variant: "destructive"
+      });
     } finally {
       setLoadingMore(false);
     }
@@ -123,6 +135,11 @@ export function Gallery() {
       setIsAuthenticated(!!user);
     } catch (error) {
       console.error('Error checking auth:', error);
+      toast({
+        title: "Authentication error",
+        description: "Please refresh the page to try again",
+        variant: "destructive"
+      });
     }
   };
 

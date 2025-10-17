@@ -4,6 +4,7 @@ import { Eye, Heart, Play } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useToast } from '@/hooks/use-toast';
 
 interface Clip {
   id: string;
@@ -23,6 +24,7 @@ export function ClipCard({ clip }: ClipCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const hasLoadedViews = useRef(false);
   const isMobile = useIsMobile();
+  const { toast } = useToast();
 
   const duration = clip.duration_ms / 1000;
   const minutes = Math.floor(duration / 60);
@@ -59,6 +61,11 @@ export function ClipCard({ clip }: ClipCardProps) {
 
       if (error) {
         console.error('Error fetching view count:', error);
+        toast({
+          title: "Failed to load view count",
+          description: "Could not fetch video statistics",
+          variant: "destructive"
+        });
         setViewCount(0);
         return;
       }
@@ -66,6 +73,11 @@ export function ClipCard({ clip }: ClipCardProps) {
       setViewCount(data?.viewCount || 0);
     } catch (error) {
       console.error('Error fetching view count:', error);
+      toast({
+        title: "Failed to load view count",
+        description: "Network error while fetching video statistics",
+        variant: "destructive"
+      });
       setViewCount(0);
     }
   };
