@@ -166,7 +166,7 @@ export default function Capture() {
 
       const { data: userData, error: userError } = await supabase
         .from("users")
-        .select("email_verified")
+        .select("email, email_verified")
         .eq("id", session.user.id)
         .single();
 
@@ -181,7 +181,7 @@ export default function Capture() {
         return;
       }
 
-      if (!userData?.email_verified) {
+      if (userData.email && !userData.email_verified) {
         navigate("/login");
       }
     } catch (error) {
