@@ -40,10 +40,41 @@ const hasMultipleCameras = (): boolean => {
 };
 
 export default function Capture() {
+  // Controls the main UI flow through the capture process:
+  // - "0-camera-selection": Initial screen for mobile devices to choose front/back camera
+  // - "1-design-brew": Parameter setup screen where users configure their AI brew settings
+  // - "2-stream": Active streaming phase with live video output and recording controls
+  // Note: The stream is always pre-loading in the background (hidden container) during
+  // phases 0 and 1, then becomes visible when transitioning to phase 2
+  // Transition phases: {idx+1}-{phase}-fade-out for smooth animations (fade-in handled by CSS)
+  const [uiPhase, setUiPhase] = useState<
+    | "0-camera-selection"
+    | "0-camera-selection-fade-out"
+    | "1-design-brew"
+    | "1-design-brew-fade-out"
+    | "2-stream"
+  >(
+    hasMultipleCameras() ? "0-camera-selection" : "1-design-brew"
+  );
+
+  // Helper function to transition between phases with fade effects
+  const transitionToPhase = useCallback((intermediate: typeof uiPhase, timeout: number, next: typeof uiPhase) => {
+    setUiPhase(curr => {
+      if (curr === next) {
+        // Skip the intermediate phase transition if we're already at the next phase
+        return next;
+      }
+      // Schedule the next phase transition after the timeout
+      setTimeout(() => {
+        setUiPhase(next);
+      }, timeout);
+      return intermediate;
+    })
+  }, []);
+
   const [cameraType, setCameraType] = useState<"user" | "environment" | null>(
     null
   );
-  const [setupComplete, setSetupComplete] = useState(false);
   const [loading, setLoading] = useState(false);
   const [streamId, setStreamId] = useState<string | null>(null);
   const [playbackId, setPlaybackId] = useState<string | null>(null);
@@ -100,25 +131,18 @@ export default function Capture() {
 
   const initializeStream = useCallback(
     async (_type: "user" | "environment", _initialPrompt: string) => {
-      // Simplified: streaming is handled by DaydreamCanvas; just show loading until onReady
       setLoading(true);
     },
     []
   );
 
-  // We use a separate state to track if we should show camera selection
-  // Only show camera selection screen if there are actually multiple cameras
-  const [showCameraSelection, setShowCameraSelection] = useState(
-    hasMultipleCameras()
-  );
 
   const selectCamera = useCallback(async (type: "user" | "environment") => {
     setCameraType(type);
-    setShowCameraSelection(false); // Hide camera selection screen
+    transitionToPhase("0-camera-selection-fade-out", 300, "1-design-brew");
     // Reset prompt for new camera
     setBrewParams((prev) => ({ ...prev, prompt: "" }));
-    // Don't start stream yet - wait for user to configure params and hit "Start"
-  }, []);
+  }, [transitionToPhase]);
 
   const startStream = useCallback(async () => {
     if (!cameraType) {
@@ -137,9 +161,9 @@ export default function Capture() {
       return;
     }
 
-    setLoading(false); // Ensure loading is false BEFORE setting setupComplete
-    setSetupComplete(true);
-  }, [cameraType, brewParams.prompt, toast]);
+    setLoading(false); // Ensure loading is false BEFORE transitioning
+    transitionToPhase("1-design-brew-fade-out", 300, "2-stream");
+  }, [cameraType, brewParams.prompt, toast, transitionToPhase]);
 
   // Auto-start camera on desktop (non-mobile devices)
   useEffect(() => {
@@ -153,8 +177,7 @@ export default function Capture() {
         setAutoStartChecked(true);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStartChecked, loading]);
+  }, [autoStartChecked, loading, selectCamera]);
 
   // DaydreamCanvas abstracts streaming; no local WHIP logic here
 
@@ -583,12 +606,18 @@ export default function Capture() {
   // Render content based on current state
   let content;
 
+  // Determine base phase and transition state
+  const isFadeOut = uiPhase.includes('-fade-out');
+  const basePhase = uiPhase.replace(/-fade-out$/, '') as "0-camera-selection" | "1-design-brew" | "2-stream";
+
   // Camera selection screen - shown on mobile devices
-  if (showCameraSelection) {
+  if (basePhase === "0-camera-selection") {
     const showMultipleCameras = hasMultipleCameras();
 
     content = (
-      <div className="fixed inset-0 flex items-center justify-center p-6 bg-neutral-950 text-neutral-200">
+      <div className={`fixed inset-0 flex items-center justify-center p-6 bg-neutral-950 text-neutral-200 transition-opacity duration-300 ${
+        isFadeOut ? 'opacity-0' : 'opacity-100'
+      }`}>
         <div className="max-w-md w-full text-center space-y-6">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-neutral-100 to-neutral-400 bg-clip-text text-transparent mb-2">
@@ -660,9 +689,11 @@ export default function Capture() {
     );
   }
   // Parameter setup screen - shown after camera selection but before stream starts
-  else if (!setupComplete) {
+  else if (basePhase === "1-design-brew") {
     content = (
-      <div className="fixed inset-0 flex flex-col bg-neutral-950 text-neutral-200 animate-fade-in">
+      <div className={`fixed inset-0 flex flex-col bg-neutral-950 text-neutral-200 transition-opacity duration-300 ${
+        isFadeOut ? 'opacity-0' : 'opacity-100'
+      }`}>
         {/* Header Section */}
         <div className="flex-shrink-0 px-6 pt-6 pb-4 text-center">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-neutral-100 to-neutral-400 bg-clip-text text-transparent">
@@ -703,7 +734,7 @@ export default function Capture() {
         </div>
       </div>
     );
-  } else {
+  } else if (basePhase === "2-stream") {
     // Main streaming view is now handled by the secret container below
     content = null;
   }
@@ -714,8 +745,10 @@ export default function Capture() {
       {/* Secret streaming container - hidden during setup, visible after */}
       <div
         className={
-          setupComplete
-            ? "fixed inset-0 flex flex-col bg-neutral-950 text-neutral-200 animate-fade-in"
+          basePhase === "2-stream"
+            ? `fixed inset-0 flex flex-col bg-neutral-950 text-neutral-200 transition-opacity duration-300 ${
+                isFadeOut ? 'opacity-0' : 'opacity-100'
+              }`
             : "fixed top-0 left-0 w-1 h-1 opacity-0 pointer-events-none overflow-hidden"
         }
       >
