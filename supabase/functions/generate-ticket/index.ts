@@ -1,4 +1,4 @@
-// Version: 2025-10-16-v5
+// Version: 2025-10-16-v6
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
