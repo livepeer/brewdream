@@ -25,32 +25,32 @@ const TEXTURES = [
   {
     id: "dragon_scales",
     url: "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/roof_tiles/roof_tiles_diff_1k.jpg",
-    name: "Dragon Scales (Roof Tiles, PH 1K)",
+    name: "Dragon Scales",
   },
   {
     id: "water_ripples",
     url: "https://media.gettyimages.com/id/585332126/photo/rock-face.jpg?s=612x612&w=gi&k=20&c=bX6I0qs7hVDXs0ZUaqPUb1uLkLaZm-ASZxVd5TDXW-A=",
-    name: "Water Ripples (TextureLabs)",
+    name: "Water Ripples",
   },
   {
     id: "lightning",
     url: "https://opengameart.org/sites/default/files/l1.png",
-    name: "Lightning Bolt (OGA PNG)",
+    name: "Lightning Bolt",
   },
   {
     id: "sand_dunes",
     url: "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_sand/aerial_sand_diff_1k.jpg",
-    name: "Sand Dunes (PH 1K)",
+    name: "Sand Dunes",
   },
   {
     id: "sand_dunes_2",
     url: "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/aerial_beach_01/aerial_beach_01_diff_1k.jpg",
-    name: "Beach Ripples (PH 1K)",
+    name: "Beach Ripples",
   },
   {
     id: "foam_ocean",
     url: "https://t3.ftcdn.net/jpg/02/03/50/32/360_F_203503200_3M3ZmpW9nhU6faaF3fewlkIMtRWxlHye.jpg",
-    name: "Ocean Foam (ambientCG 1K)",
+    name: "Ocean Foam",
   },
 ];
 
