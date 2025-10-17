@@ -1,3 +1,4 @@
+// Version: 2025-10-17-v2
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
