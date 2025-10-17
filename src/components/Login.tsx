@@ -1,40 +1,66 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
-import { Mail } from 'lucide-react';
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+// shadcn "pin" input
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { Mail, RotateCw, CheckCircle2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export function Login() {
-  const [email, setEmail] = useState('');
-  // Separate loading flags so one action doesn't lock the whole form
+  const [email, setEmail] = useState("");
   const [anonLoading, setAnonLoading] = useState(false);
   const [emailLoading, setEmailLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
+
+  // OTP flow
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [justResent, setJustResent] = useState(false);
+  const cooldownTimerRef = useRef<number | null>(null);
+
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Check if user is already logged in (anonymous or authenticated)
+  // Check existing session
   useEffect(() => {
     const checkExistingSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session) {
-        // User is already logged in
-        const isAnon = session.user.is_anonymous || false;
+        const isAnon = (session.user as any)?.is_anonymous || false;
         setIsAnonymous(isAnon);
-
-        // If they're authenticated (not anonymous), redirect to capture
-        if (!isAnon) {
-          navigate('/capture');
-        }
+        if (!isAnon) navigate("/capture");
       }
     };
-
     checkExistingSession();
   }, [navigate]);
+
+  // Cleanup timer
+  useEffect(() => {
+    return () => {
+      if (cooldownTimerRef.current) window.clearInterval(cooldownTimerRef.current);
+    };
+  }, []);
+
+  const startResendCooldown = (secs = 60) => {
+    setResendCooldown(secs);
+    if (cooldownTimerRef.current) window.clearInterval(cooldownTimerRef.current);
+    cooldownTimerRef.current = window.setInterval(() => {
+      setResendCooldown((s) => {
+        if (s <= 1) {
+          if (cooldownTimerRef.current) window.clearInterval(cooldownTimerRef.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  };
 
   const handleAnonymousLogin = async () => {
     setAnonLoading(true);
@@ -42,221 +68,348 @@ export function Login() {
       const { data, error } = await supabase.auth.signInAnonymously();
       if (error) throw error;
 
-      // Ensure the app-level user row exists BEFORE redirecting
       if (data.user) {
         const { error: insertError } = await supabase
-          .from('users')
-          .upsert({ id: data.user.id, email: null }, { onConflict: 'id' });
+          .from("users")
+          .upsert({ id: data.user.id, email: null }, { onConflict: "id" });
         if (insertError) throw insertError;
       }
 
-      toast({ title: 'Welcome!', description: 'You can start creating clips right away' });
-      navigate('/capture');
+      toast({ title: "Welcome!", description: "You can start creating clips right away" });
+      navigate("/capture");
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setAnonLoading(false);
     }
   };
 
-  const handleSendMagicLink = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailLoading(true);
-
     try {
-      // Get current session to check if user is anonymous
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const currentUserId = session?.user?.id;
 
-      // Create user record immediately with email_verified=false
-      // This allows us to track signup attempts and prevents conflicts
-      const { error: insertError } = await supabase
-        .from('users')
-        .upsert({
-          id: currentUserId || undefined, // Use current user ID if anonymous, otherwise let DB generate
-          email: email,
-          email_verified: false
-        }, { 
-          onConflict: 'email',
-          ignoreDuplicates: false 
-        });
-
-      // If there's an error and it's not a duplicate, throw it
-      if (insertError && !insertError.message.includes('duplicate')) {
-        console.error('Failed to create user record:', insertError);
-        // Don't throw here, just log the error and continue
+      // Create/ensure user row (email_verified = false)
+      const { error: insertError } = await supabase.from("users").upsert(
+        {
+          id: currentUserId || undefined,
+          email,
+          email_verified: false,
+        },
+        { onConflict: "email", ignoreDuplicates: false },
+      );
+      if (insertError && !String(insertError?.message || "").includes("duplicate")) {
+        console.warn("Failed to create user record:", insertError);
       }
 
-      // If user is anonymous, link their account BEFORE sending the email
       if (isAnonymous && currentUserId) {
+        // Link email to the existing anonymous account (triggers email change OTP)
         const { error: updateError } = await supabase.auth.updateUser({ email });
         if (updateError) throw updateError;
+      } else {
+        // Send OTP for passwordless sign-in
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: { shouldCreateUser: true },
+        });
+        if (error) throw error;
       }
 
-      // Send magic link via email
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/capture`,
-        },
-      });
+      setOtpSent(true);
+      setOtpCode("");
+      startResendCooldown(60);
 
-      if (error) throw error;
-
-      setEmailSent(true);
       toast({
-        title: 'Check your email',
-        description: 'Click the link in your email to sign in',
+        title: "OTP sent",
+        description: "Check your email for a 6-digit code.",
       });
     } catch (error: any) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setEmailLoading(false);
     }
   };
 
-  // Handle auth state changes (when user clicks magic link)
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const wasAnonymous = session.user.is_anonymous || false;
+  const handleVerifyOtp = async (code: string) => {
+    setVerifying(true);
+    try {
+      if (isAnonymous) {
+        // Confirm email change on the existing session
+        const { data, error } = await supabase.auth.verifyOtp({
+          email,
+          token: code,
+          type: "email_change",
+        });
+        if (error) throw error;
 
-        // Only mark email as verified for non-anonymous sessions
+        // Refresh session and upsert users.email_verified = true
+        const {
+          data: { session: newSession },
+        } = await supabase.auth.getSession();
+        const userId = newSession?.user?.id;
+        const userEmail = newSession?.user?.email;
+        if (userId) {
+          await supabase
+            .from("users")
+            .upsert({ id: userId, email: userEmail || email, email_verified: true }, { onConflict: "id" });
+        }
+
+        toast({
+          title: "Success!",
+          description: "Email added to your account",
+        });
+        navigate("/capture");
+      } else {
+        // Verify sign-in OTP
+        const { data, error } = await supabase.auth.verifyOtp({
+          email,
+          token: code,
+          type: "email",
+        });
+        if (error) throw error;
+
+        // Upsert users.email_verified = true
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const userId = session?.user?.id;
+        const userEmail = session?.user?.email || email;
+
+        if (userId) {
+          await supabase
+            .from("users")
+            .upsert({ id: userId, email: userEmail, email_verified: true }, { onConflict: "id" });
+        }
+
+        toast({
+          title: "Logged in!",
+          description: "OTP verified successfully",
+        });
+        navigate("/capture");
+      }
+    } catch (error: any) {
+      setOtpCode("");
+      toast({ title: "Invalid code", description: error.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (resendCooldown > 0 || !email) return;
+    try {
+      if (isAnonymous) {
+        const { error } = await supabase.auth.updateUser({ email });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: { shouldCreateUser: true },
+        });
+        if (error) throw error;
+      }
+      setJustResent(true);
+      startResendCooldown(60);
+      setTimeout(() => setJustResent(false), 900);
+    } catch (error: any) {
+      toast({ title: "Resend failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+  // Keep auth listener for safety (e.g., if user clicks link instead)
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        const wasAnonymous = (session.user as any)?.is_anonymous || false;
         if (!wasAnonymous) {
           await supabase
-            .from('users')
-            .upsert({
-              id: session.user.id,
-              email: session.user.email,
-              email_verified: true
-            }, { onConflict: 'id' });
+            .from("users")
+            .upsert({ id: session.user.id, email: session.user.email, email_verified: true }, { onConflict: "id" });
         }
-        
         toast({
-          title: 'Success!',
-          description: wasAnonymous ? 'Email added to your account' : 'Logged in successfully',
+          title: "Success!",
+          description: wasAnonymous ? "Email added to your account" : "Logged in successfully",
         });
-
-        navigate('/capture');
+        navigate("/capture");
       }
     });
-
     return () => subscription.unsubscribe();
   }, [navigate, toast]);
 
   return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-background">
-        <div className="w-full max-w-md space-y-8">
-          <Link
-            to="/"
-            className="flex items-center gap-3 mb-8 justify-center hover:opacity-90 transition"
-          >
-            <img src="/daydream-logo.svg" alt="Daydream" className="h-8 w-auto" />
-            <h2 className="text-xl font-bold text-foreground">Brewdream</h2>
-          </Link>
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-background">
+      <div className="w-full max-w-md space-y-8">
+        <Link to="/" className="flex items-center gap-3 mb-8 justify-center hover:opacity-90 transition">
+          <img src="/daydream-logo.svg" alt="Daydream" className="h-8 w-auto" />
+          <h2 className="text-xl font-bold text-foreground">Brewdream</h2>
+        </Link>
 
-          <div className="text-center bg-neutral-950 shadow-lg shadow-[0_0_15px_2px_theme(colors.neutral.800/0.4)] border border-neutral-800 rounded-3xl p-6">
+        <div className="text-center bg-neutral-950 shadow-lg shadow-[0_0_15px_2px_theme(colors.neutral.800/0.4)] border border-neutral-800 rounded-3xl p-6">
+          {!otpSent ? (
+            <>
+              <h1 className="text-3xl font-bold mb-2">{isAnonymous ? "Add your email" : "Sign in"}</h1>
+              <p className="text-muted-foreground">
+                {isAnonymous ? "Save your clips and get a coffee ticket" : "Create AI video clips in seconds"}
+              </p>
 
+              <div className="space-y-4">
+                {!isAnonymous && (
+                  <>
+                    <Button
+                      onClick={handleAnonymousLogin}
+                      disabled={anonLoading || emailLoading}
+                      className="w-full h-14 bg-neutral-100 text-neutral-900 mt-8 hover:bg-neutral-200 border border-border transition-colors"
+                    >
+                      {anonLoading ? "Loading..." : "Continue without email"}
+                    </Button>
 
-            <h1 className="text-3xl font-bold mb-2">
-              {emailSent ? 'Check your email' : isAnonymous ? 'Add your email' : 'Sign in'}
-            </h1>
-            <p className="text-muted-foreground">
-              {emailSent
-                ? 'Click the link in your email to sign in'
-                : isAnonymous
-                ? 'Save your clips and get a coffee ticket'
-                : 'Create AI video clips in seconds'}
-            </p>
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-border" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">or sign in with email</span>
+                      </div>
+                    </div>
+                  </>
+                )}
 
-
-          {!emailSent ? (
-            <div className="space-y-4">
-              {!isAnonymous && (
-                <>
+                <form onSubmit={handleSendOtp} className="space-y-4">
+                  <Input
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-12 bg-card border-border text-foreground"
+                  />
                   <Button
-                    onClick={handleAnonymousLogin}
-                    disabled={anonLoading || emailLoading}
-                    className="w-full h-14 bg-neutral-100 text-neutral-900 mt-8 hover:bg-neutral-200 border border-border transition-colors"
+                    type="submit"
+                    disabled={emailLoading || anonLoading}
+                    className="w-full h-12 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 border border-border"
                   >
-                    {anonLoading ? 'Loading...' : 'Continue without email'}
+                    {emailLoading ? "Sending..." : isAnonymous ? "Add email & get code" : "Send code"}
                   </Button>
+                </form>
 
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">or sign in with email</span>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <form onSubmit={handleSendMagicLink} className="space-y-4">
-                <Input
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="h-12 bg-card border-border text-foreground"
-                />
-                <Button
-                  type="submit"
-                  disabled={emailLoading || anonLoading}
-                  className={`w-full h-12 ${
-                    isAnonymous
-                      ? 'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 border border-border'
-                      : 'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 border border-border'
-                  }`}
-                >
-                  {emailLoading
-                    ? 'Sending...'
-                    : isAnonymous
-                    ? 'Add email & get coffee ticket'
-                    : 'Send login link'}
-                </Button>
-              </form>
-
-              {isAnonymous && (
-                <Button
-                  onClick={() => navigate('/capture')}
-                  disabled={anonLoading || emailLoading}
-                  variant="outline"
-                  className="w-full h-12 border-border text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Stay Anonymous
-                </Button>
-              )}
-            </div>
+                {isAnonymous && (
+                  <Button
+                    onClick={() => navigate("/capture")}
+                    disabled={anonLoading || emailLoading}
+                    variant="outline"
+                    className="w-full h-12 border-border text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Stay Anonymous
+                  </Button>
+                )}
+              </div>
+            </>
           ) : (
-            <div className="space-y-6 py-8">
+            <div className="space-y-6 py-4">
               <div className="flex flex-col items-center justify-center space-y-4">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
                   <Mail className="w-8 h-8 text-primary" />
                 </div>
+
                 <div className="text-center space-y-2">
+                  <h1 className="text-2xl font-bold">Enter the 6-digit code</h1>
                   <p className="text-sm text-muted-foreground">
-                    We sent an email to
-                  </p>
-                  <p className="font-semibold text-foreground">{email}</p>
-                  <p className="text-sm text-muted-foreground mt-4">
-                    Click the link in the email to sign in. The link will expire in 1 hour.
+                    We sent a code to <span className="font-medium text-foreground">{email}</span>
                   </p>
                 </div>
+
+                <div className="w-full flex flex-col items-center gap-6 mt-2">
+                  <InputOTP
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={setOtpCode}
+                    // When all slots are filled, verify
+                    onComplete={handleVerifyOtp}
+                    disabled={verifying}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+
+                  <Button
+                    onClick={() => handleVerifyOtp(otpCode)}
+                    disabled={verifying || otpCode.length !== 6}
+                    className="w-full h-12 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 border border-border"
+                  >
+                    {verifying ? "Verifying…" : "Verify code"}
+                  </Button>
+
+                  <div className="text-sm text-muted-foreground flex items-center gap-2">
+                    {resendCooldown > 0 ? (
+                      <>
+                        <RotateCw className="w-4 h-4 animate-spin-slow opacity-70" />
+                        Resend available in {resendCooldown}s
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResend}
+                        className="underline underline-offset-4 hover:text-foreground"
+                      >
+                        Resend code
+                      </button>
+                    )}
+                    <AnimatePresence>
+                      {justResent && (
+                        <motion.span
+                          initial={{ opacity: 0, y: -6, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -6, scale: 0.95 }}
+                          transition={{ duration: 0.25 }}
+                          className="inline-flex items-center gap-1 text-emerald-400"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          Sent!
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpSent(false);
+                      setOtpCode("");
+                      if (cooldownTimerRef.current) window.clearInterval(cooldownTimerRef.current);
+                      setResendCooldown(0);
+                    }}
+                    className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+                  >
+                    Use a different email
+                  </button>
+                </div>
               </div>
-              <Button
-                onClick={() => setEmailSent(false)}
-                variant="outline"
-                className="w-full h-12 border-border text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Use a different email
-              </Button>
             </div>
           )}
-          </div>
         </div>
       </div>
-    );
+
+      <style>{`
+        .animate-spin-slow {
+          animation: spin 2.2s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg) }
+          to { transform: rotate(360deg) }
+        }
+      `}</style>
+    </div>
+  );
 }
