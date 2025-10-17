@@ -68,4 +68,3 @@ SET likes_count = (
   WHERE clip_likes.clip_id = clips.id
 )
 WHERE likes_count = 0;
-

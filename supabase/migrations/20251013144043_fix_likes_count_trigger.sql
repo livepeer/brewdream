@@ -57,4 +57,3 @@ SET likes_count = (
   FROM public.clip_likes
   WHERE clip_likes.clip_id = clips.id
 );
-

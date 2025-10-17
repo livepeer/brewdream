@@ -29,4 +29,3 @@ COMMENT ON COLUMN public.users.email IS
 
 COMMENT ON TABLE public.users IS
   'App users. Can be anonymous (email=NULL) or authenticated (email set). ID matches Supabase auth.users.id.';
-
