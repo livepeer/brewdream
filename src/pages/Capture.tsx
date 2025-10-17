@@ -160,6 +160,17 @@ export default function Capture() {
     } = await supabase.auth.getSession();
     if (!session) {
       navigate("/login");
+      return;
+    }
+
+    const { data: userData } = await supabase
+      .from("users")
+      .select("email_verified")
+      .eq("id", session.user.id)
+      .single();
+
+    if (!userData?.email_verified) {
+      navigate("/login");
     }
   }, [navigate]);
   useEffect(() => {
