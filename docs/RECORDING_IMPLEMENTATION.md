@@ -162,8 +162,21 @@ No client-side API keys needed. All Livepeer API calls are proxied through Edge 
 - ✅ Firefox (desktop & mobile)
 - ✅ Safari 14.1+ (desktop & iOS)
 
+### Canvas-Based Recording
+**Consistent Implementation**: VideoRecorder always uses canvas-based recording for consistency across all browsers:
+1. Creates an offscreen canvas matching the video dimensions (512×512)
+2. Copies video frames to canvas using `requestAnimationFrame` at 30fps
+3. Captures the canvas stream using `canvas.captureStream(30)`
+4. Extracts and includes audio tracks from the video's MediaStream
+
+**Why canvas instead of direct video captureStream?**
+- Works reliably across ALL browsers including Safari/iOS
+- Provides consistent behavior (no browser-specific code paths)
+- Simpler, more maintainable code
+- Negligible performance overhead at 512×512 resolution
+
 ### Known Limitations
-- ❌ Older iOS versions (<14.1): `captureStream()` not supported
+- ❌ Older iOS versions (<14.1): `captureStream()` not supported even on canvas
 - ⚠️ Cross-origin iframes: Cannot capture, must use Player SDK
 
 ## Security

@@ -29,3 +29,6 @@ verify_jwt = true
 
 [functions.get-viewership]
 verify_jwt = false
+
+[functions.proxy-raw-video]
+verify_jwt = false

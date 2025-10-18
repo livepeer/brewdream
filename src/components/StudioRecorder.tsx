@@ -49,11 +49,6 @@ export interface RecordingProgress {
 }
 
 
-// Extend HTMLVideoElement to include captureStream method
-interface HTMLVideoElementWithCapture extends HTMLVideoElement {
-  captureStream?: () => MediaStream;
-}
-
 // Internal type for raw recording result from VideoRecorder
 interface RecordedBlob {
   data: Blob;
@@ -63,12 +58,18 @@ interface RecordedBlob {
 
 /**
  * Start recording from a video element using MediaRecorder
+ *
+ * Uses canvas-based recording for consistent behavior across all browsers.
+ * This approach works reliably on Chrome, Firefox, Safari (desktop & iOS).
  */
 class VideoRecorder {
   private recorder: MediaRecorder | null = null;
   private chunks: BlobPart[] = [];
   private startTime: number | null = null;
   private mimeType: string = '';
+  private canvas: HTMLCanvasElement | null = null;
+  private canvasContext: CanvasRenderingContext2D | null = null;
+  private frameAnimationId: number | null = null;
 
   constructor(private videoElement: HTMLVideoElement) {}
 
@@ -76,11 +77,67 @@ class VideoRecorder {
    * Start recording the video stream
    */
   async start(): Promise<void> {
-    // Capture stream from video element
-    const stream = (this.videoElement as HTMLVideoElementWithCapture).captureStream?.();
+    // Always use canvas-based recording for consistency across all browsers
+    console.log('Starting canvas-based recording');
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+
+    if (!ctx) {
+      throw new Error('Failed to create canvas context for recording');
+    }
+
+    // Set canvas size to match video
+    canvas.width = this.videoElement.videoWidth || 512;
+    canvas.height = this.videoElement.videoHeight || 512;
+
+    console.log('Canvas recording size:', canvas.width, 'x', canvas.height);
+
+    this.canvas = canvas;
+    this.canvasContext = ctx;
+
+    // Function to copy video frame to canvas
+    const copyFrame = () => {
+      if (!this.canvas || !this.canvasContext) return;
+
+      try {
+        // Copy current video frame to canvas
+        this.canvasContext.drawImage(this.videoElement, 0, 0, canvas.width, canvas.height);
+
+        // Schedule next frame
+        this.frameAnimationId = requestAnimationFrame(copyFrame);
+      } catch (err) {
+        console.error('Error copying video frame to canvas:', err);
+      }
+    };
+
+    // Start copying frames
+    copyFrame();
+
+    // Capture stream from canvas (video only)
+    const canvasStream = canvas.captureStream(30); // 30 fps
+    console.log('Canvas stream created with', canvasStream.getTracks().length, 'video tracks');
+
+    // Try to get audio from the video element if available
+    try {
+      // Extract audio tracks from video's MediaStream
+      const videoSrcObject = (this.videoElement as any).srcObject as MediaStream | null;
+      if (videoSrcObject && videoSrcObject.getAudioTracks) {
+        const audioTracks = videoSrcObject.getAudioTracks();
+        if (audioTracks.length > 0) {
+          console.log('Found', audioTracks.length, 'audio tracks from video srcObject');
+          // Add audio tracks to the canvas stream
+          audioTracks.forEach(track => canvasStream.addTrack(track));
+        }
+      }
+    } catch (err) {
+      console.warn('Could not extract audio tracks from video element:', err);
+    }
+
+    const stream = canvasStream;
 
     if (!stream) {
-      throw new Error('captureStream is not supported on this video element');
+      throw new Error('Failed to create canvas stream');
     }
 
     // Try different MIME types in order of preference
@@ -156,6 +213,14 @@ class VideoRecorder {
       this.recorder!.stop();
     });
 
+    // Clean up canvas resources
+    if (this.frameAnimationId !== null) {
+      cancelAnimationFrame(this.frameAnimationId);
+      this.frameAnimationId = null;
+    }
+    this.canvas = null;
+    this.canvasContext = null;
+
     const durationMs = Date.now() - this.startTime;
 
     // Ensure we have chunks
@@ -196,10 +261,16 @@ class VideoRecorder {
   }
 
   /**
-   * Check if captureStream is supported
+   * Check if canvas-based recording is supported
    */
   static isSupported(videoElement: HTMLVideoElement): boolean {
-    return typeof (videoElement as HTMLVideoElementWithCapture).captureStream === 'function';
+    // Check if canvas captureStream is available (works on all modern browsers)
+    try {
+      const testCanvas = document.createElement('canvas');
+      return typeof testCanvas.captureStream === 'function';
+    } catch {
+      return false;
+    }
   }
 }
 

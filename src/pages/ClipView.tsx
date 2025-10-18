@@ -635,13 +635,37 @@ export default function ClipView() {
             >
               {assetStatus === 'processing' && clip.raw_uploaded_file_url ? (
                 // Raw video element for processing state
-                <video
-                  src={clip.raw_uploaded_file_url}
-                  controls
-                  autoPlay
-                  loop
-                  className="w-full h-full object-cover"
-                />
+                <div className="w-full h-full flex items-center justify-center bg-neutral-900 rounded-lg">
+                  <video
+                    src={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxy-raw-video/${clip.id}/brewdream-${clip.id.substring(0, 8)}.webm`}
+                    controls
+                    autoPlay
+                    loop
+                    className="w-full h-full object-cover"
+                    preload="metadata"
+                    onError={(e) => {
+                      console.error('Video playback error:', e);
+                      // Show fallback message for Safari WebM issues
+                      const video = e.target as HTMLVideoElement;
+                      const parent = video.parentElement;
+                      if (parent) {
+                        parent.innerHTML = `
+                          <div class="flex flex-col items-center justify-center h-full text-center p-4">
+                            <div class="text-4xl mb-4">🎬</div>
+                            <h3 class="text-lg font-semibold mb-2">Video Processing</h3>
+                            <p class="text-sm text-muted-foreground mb-4">
+                              Your video is being processed and will be ready shortly.
+                            </p>
+                            <div class="flex items-center gap-2 text-xs text-muted-foreground">
+                              <div class="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                              Processing...
+                            </div>
+                          </div>
+                        `;
+                      }
+                    }}
+                  />
+                </div>
               ) : (
                 // Existing PlayerWithControls for ready state
                 <PlayerWithControls
