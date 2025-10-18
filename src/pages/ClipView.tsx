@@ -110,7 +110,7 @@ export default function ClipView() {
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [viewCount, setViewCount] = useState<number | null>(null);
   const [viewsLoading, setViewsLoading] = useState(true);
-  const [assetStatus, setAssetStatus] = useState<'processing' | 'ready' | 'error'>('processing');
+  const [assetStatus, setAssetStatus] = useState<'processing' | 'ready' | 'error'>(null);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [assetError, setAssetError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -633,13 +633,14 @@ export default function ClipView() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4 }}
             >
-              {assetStatus === 'processing' && clip.raw_uploaded_file_url ? (
+              {assetStatus === 'processing' ? (
                 // Raw video element for processing state
                 <div className="w-full h-full flex items-center justify-center bg-neutral-900 rounded-lg">
                   <video
-                    src={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxy-raw-video/${clip.id}`}
+                    src={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxy-raw-video/${clip.id}/brewdream-${clip.id.substring(0, 8)}.webm`}
                     controls
                     autoPlay
+                    muted
                     loop
                     className="w-full h-full object-cover"
                     preload="metadata"
