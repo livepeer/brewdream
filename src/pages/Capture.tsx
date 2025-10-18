@@ -10,6 +10,7 @@ import {
   Sparkles,
   Mic,
   MicOff,
+  RefreshCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import * as Player from "@livepeer/react/player";
@@ -103,15 +104,27 @@ export default function Capture() {
   // Note: The stream is always pre-loading in the background (hidden container) during
   // phases 0 and 1, then becomes visible when transitioning to phase 2
   // Transition phases: {idx+1}-{phase}-fade-out for smooth animations (fade-in handled by CSS)
+  // Determine initial UI phase based on query string and device
+  const initialUiPhase = (() => {
+    const camera = searchParams.get("camera");
+    const hasValidCamera = camera === "user" || camera === "environment";
+    
+    // If there's a valid camera in query string, skip to design brew phase
+    if (hasValidCamera) {
+      return "1-design-brew";
+    }
+    
+    // Otherwise, show camera selection on mobile, design brew on desktop
+    return hasMultipleCameras() ? "0-camera-selection" : "1-design-brew";
+  })();
+
   const [uiPhase, setUiPhase] = useState<
     | "0-camera-selection"
     | "0-camera-selection-fade-out"
     | "1-design-brew"
     | "1-design-brew-fade-out"
     | "2-stream"
-  >(
-    hasMultipleCameras() ? "0-camera-selection" : "1-design-brew"
-  );
+  >(initialUiPhase);
 
   // Helper function to transition between phases with fade effects
   const transitionToPhase = useCallback((intermediate: typeof uiPhase, timeout: number, next: typeof uiPhase) => {
@@ -128,9 +141,14 @@ export default function Capture() {
     })
   }, []);
 
-  const [cameraType, setCameraType] = useState<"user" | "environment" | null>(
-    null
-  );
+  // Read camera type from query string - only accept exact internal values
+  const [cameraType, setCameraType] = useState<"user" | "environment" | null>(() => {
+    const camera = searchParams.get("camera");
+    if (camera === "user" || camera === "environment") {
+      return camera;
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(false);
   const [streamId, setStreamId] = useState<string | null>(null);
   const [playbackId, setPlaybackId] = useState<string | null>(null);
@@ -184,8 +202,6 @@ export default function Capture() {
   const selectCamera = useCallback(async (type: "user" | "environment") => {
     setCameraType(type);
     transitionToPhase("0-camera-selection-fade-out", 300, "1-design-brew");
-    // Reset prompt for new camera
-    setBrewParams((prev) => ({ ...prev, prompt: "" }));
   }, [transitionToPhase]);
 
   const startStream = useCallback(async () => {
@@ -617,9 +633,14 @@ export default function Capture() {
     }
   }, [playbackUrl, isPlaying]);
 
-  // Persist brew params to query string on change
+  // Persist brew params and camera type to query string on change
   useEffect(() => {
     const newParams = new URLSearchParams();
+    
+    // Add camera type to query string (using exact internal values)
+    if (cameraType) {
+      newParams.set("camera", cameraType);
+    }
     
     // Only add params that have non-default values
     if (brewParams.prompt) {
@@ -640,7 +661,7 @@ export default function Capture() {
 
     // Update URL without triggering navigation
     setSearchParams(newParams, { replace: true });
-  }, [brewParams, setSearchParams]);
+  }, [brewParams, cameraType, setSearchParams]);
 
   const onDaydreamReady = useCallback(
     async ({ streamId: sid, playbackId: pid, playbackUrl: purl }) => {
@@ -946,6 +967,26 @@ export default function Capture() {
                 )}
               </Button>
             </div>
+
+            {/* Switch Camera Button - Only show on mobile devices */}
+            {hasMultipleCameras() && (
+              <div className="absolute top-3 right-3">
+                <Button
+                  onClick={() => {
+                    const newCamera = cameraType === "user" ? "environment" : "user";
+                    // Let DaydreamCanvas handle the camera switch
+                    setCameraType(newCamera);
+                  }}
+                  disabled={!playbackId || recording || uploadingClip}
+                  size="icon"
+                  variant="secondary"
+                  className="w-12 h-12 rounded-full shadow-lg transition-all duration-200 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 disabled:opacity-50"
+                  title="Switch camera"
+                >
+                  <RefreshCcw className="w-5 h-5" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
