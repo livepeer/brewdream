@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -75,7 +75,26 @@ async function saveClipToDatabase(params: {
   return clip;
 }
 
+// Read brew params from query string on initial load
+const readBrewParamsFromQuery = (searchParams: URLSearchParams): BrewParams => {
+  const prompt = searchParams.get("prompt") || "";
+  const texture = searchParams.get("texture") || null;
+  const textureWeight = parseFloat(searchParams.get("textureWeight") || "0.5");
+  const intensity = parseFloat(searchParams.get("intensity") || "5");
+  const quality = parseFloat(searchParams.get("quality") || "0.4");
+
+  return {
+    prompt,
+    texture,
+    textureWeight: isNaN(textureWeight) ? 0.5 : textureWeight,
+    intensity: isNaN(intensity) ? 5 : intensity,
+    quality: isNaN(quality) ? 0.4 : quality,
+  };
+};
+
 export default function Capture() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Controls the main UI flow through the capture process:
   // - "0-camera-selection": Initial screen for mobile devices to choose front/back camera
   // - "1-design-brew": Parameter setup screen where users configure their AI brew settings
@@ -117,14 +136,10 @@ export default function Capture() {
   const [autoStartChecked, setAutoStartChecked] = useState(false);
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
 
-  // Diffusion parameters state
-  const [brewParams, setBrewParams] = useState<BrewParams>({
-    prompt: "",
-    texture: null,
-    textureWeight: 0.5,
-    intensity: 5,
-    quality: 0.4,
-  });
+  // Diffusion parameters state - initialize from query string
+  const [brewParams, setBrewParams] = useState<BrewParams>(() => 
+    readBrewParamsFromQuery(searchParams)
+  );
   const [canvasParams, setCanvasParams] = useState<StreamDiffusionParams | null>(null);
 
   const [recording, setRecording] = useState(false);
@@ -664,6 +679,31 @@ export default function Capture() {
       setShowSlowLoadingMessage(false);
     }
   }, [playbackUrl, isPlaying]);
+
+  // Persist brew params to query string on change
+  useEffect(() => {
+    const newParams = new URLSearchParams();
+    
+    // Only add params that have non-default values
+    if (brewParams.prompt) {
+      newParams.set("prompt", brewParams.prompt);
+    }
+    if (brewParams.texture) {
+      newParams.set("texture", brewParams.texture);
+    }
+    if (brewParams.textureWeight !== 0.5) {
+      newParams.set("textureWeight", brewParams.textureWeight.toString());
+    }
+    if (brewParams.intensity !== 5) {
+      newParams.set("intensity", brewParams.intensity.toString());
+    }
+    if (brewParams.quality !== 0.4) {
+      newParams.set("quality", brewParams.quality.toString());
+    }
+
+    // Update URL without triggering navigation
+    setSearchParams(newParams, { replace: true });
+  }, [brewParams, setSearchParams]);
 
   const onDaydreamReady = useCallback(
     async ({ streamId: sid, playbackId: pid, playbackUrl: purl }) => {
