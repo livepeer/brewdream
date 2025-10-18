@@ -167,6 +167,28 @@ export function Login() {
               description: "Email verified but couldn't save user data. Please try again.",
               variant: "destructive"
             });
+            setVerifying(false);
+            return;
+          }
+
+          // Wait a bit for database replication before checking
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          // Verify the update was successful by re-querying
+          const { data: verifyData, error: verifyError } = await supabase
+            .from("users")
+            .select("email_verified")
+            .eq("id", userId)
+            .single();
+
+          if (verifyError || !verifyData?.email_verified) {
+            console.error("Email verification not confirmed:", verifyError);
+            toast({
+              title: "Error",
+              description: "Email verification not confirmed. Please try again.",
+              variant: "destructive"
+            });
+            setVerifying(false);
             return;
           }
         }
@@ -203,6 +225,28 @@ export function Login() {
               description: "Logged in but couldn't save user data. Please try again.",
               variant: "destructive"
             });
+            setVerifying(false);
+            return;
+          }
+
+          // Wait a bit for database replication before checking
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          // Verify the update was successful by re-querying
+          const { data: verifyData, error: verifyError } = await supabase
+            .from("users")
+            .select("email_verified")
+            .eq("id", userId)
+            .single();
+
+          if (verifyError || !verifyData?.email_verified) {
+            console.error("Email verification not confirmed:", verifyError);
+            toast({
+              title: "Error",
+              description: "Email verification not confirmed. Please try again.",
+              variant: "destructive"
+            });
+            setVerifying(false);
             return;
           }
         }
@@ -258,6 +302,26 @@ export function Login() {
             toast({
               title: "Error",
               description: "Logged in but couldn't save user data. Please try again.",
+              variant: "destructive"
+            });
+            return;
+          }
+
+          // Wait a bit for database replication
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          // Verify the update was successful
+          const { data: verifyData, error: verifyError } = await supabase
+            .from("users")
+            .select("email_verified")
+            .eq("id", session.user.id)
+            .single();
+
+          if (verifyError || !verifyData?.email_verified) {
+            console.error("Email verification not confirmed in auth listener:", verifyError);
+            toast({
+              title: "Error",
+              description: "Email verification not confirmed. Please try logging in again.",
               variant: "destructive"
             });
             return;

@@ -181,8 +181,31 @@ export default function Capture() {
         return;
       }
 
+      // If user has an email but it's not verified, redirect to login
+      // BUT: Add a retry mechanism to handle database replication delays
       if (userData.email && !userData.email_verified) {
-        navigate("/login");
+        console.log("Email not verified, checking again after delay...");
+        
+        // Wait a moment and check one more time (handles race condition from Login page)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const { data: retryData, error: retryError } = await supabase
+          .from("users")
+          .select("email, email_verified")
+          .eq("id", session.user.id)
+          .single();
+
+        if (!retryError && retryData.email && !retryData.email_verified) {
+          // Still not verified after retry, redirect to login
+          console.log("Email still not verified after retry, redirecting to login");
+          navigate("/login");
+        } else if (!retryError && retryData.email_verified) {
+          // Verified on retry, continue
+          console.log("Email verified on retry, continuing to Capture");
+        } else if (retryError) {
+          console.error("Error on retry:", retryError);
+          navigate("/login");
+        }
       }
     } catch (error) {
       console.error("Error checking authentication:", error);
