@@ -3,7 +3,6 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion, useMotionValue, useTransform, PanInfo, animate } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/hooks/useUser';
 import { Eye, Heart, Share2, Download, Twitter, Home, Coffee, Loader2, AlertCircle, CheckCircle2, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/Header';
@@ -96,11 +95,6 @@ export default function ClipView() {
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const bgStyle = useCinematicVideoGradient(videoContainerRef);
   const navigate = useNavigate();
-  // Use the unified user hook (allow signed off for viewing clips)
-  const { user: currentUser, loading: userLoading } = useUser({ allowSignedOff: true });
-  const isAuthenticated = !!currentUser;
-  const currentUserId = currentUser?.id || null;
-  
   const [clip, setClip] = useState<Clip | null>(null);
   const [loading, setLoading] = useState(true);
   const [ticketCode, setTicketCode] = useState<string | null>(null);
@@ -108,6 +102,8 @@ export default function ClipView() {
   const [generatingTicket, setGeneratingTicket] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [isSwipeLocked, setIsSwipeLocked] = useState(true);
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
@@ -128,7 +124,18 @@ export default function ClipView() {
     ["0px 20px 40px rgba(0,0,0,0.3)", "0px 10px 20px rgba(0,0,0,0.2)", "0px 20px 40px rgba(0,0,0,0.3)"]
   );
 
-  // currentUser, isAuthenticated, and currentUserId are derived from useUser hook above
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setIsAuthenticated(!!user);
+        setCurrentUserId(user?.id || null);
+      } catch (error) {
+        console.error('Error checking auth:', error);
+      }
+    };
+    checkAuth();
+  }, []);
 
   const creationDateStr = useMemo(() => {
     if (!clip?.created_at) return '';

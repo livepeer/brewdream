@@ -5,7 +5,6 @@ import { ClipCard } from './ClipCard';
 import { FloatingFAB } from './FloatingFAB';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/hooks/useUser';
 import { Loader2 } from 'lucide-react';
 
 interface Clip {
@@ -18,13 +17,10 @@ interface Clip {
 }
 
 export function Gallery() {
-  // Use the unified user hook (allow signed off for viewing gallery)
-  const { user, loading: userLoading } = useUser({ allowSignedOff: true });
-  const isAuthenticated = !!user;
-  
   const [clips, setClips] = useState<Clip[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -35,6 +31,7 @@ export function Gallery() {
 
   useEffect(() => {
     loadClips();
+    checkAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -132,7 +129,19 @@ export function Gallery() {
     }
   };
 
-  // isAuthenticated is derived from useUser hook above
+  const checkAuth = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsAuthenticated(!!user);
+    } catch (error) {
+      console.error('Error checking auth:', error);
+      toast({
+        title: "Authentication error",
+        description: "Please refresh the page to try again",
+        variant: "destructive"
+      });
+    }
+  };
 
   if (loading) {
       return (

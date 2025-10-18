@@ -1,29 +1,33 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Video, Sparkles, Coffee } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { useUser } from '@/hooks/useUser';
 
 export function Landing() {
   const navigate = useNavigate();
-  
-  // Use the unified user hook (allow signed off to see landing page)
-  const { user, loading } = useUser({ allowSignedOff: true });
 
-  // If logged in, redirect to capture
   useEffect(() => {
-    if (!loading && user) {
+    checkAuthAndRedirect();
+  }, []);
+
+  const checkAuthAndRedirect = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    // If logged in (anonymous or authenticated), go straight to capture
+    if (session) {
       navigate('/capture');
     }
-  }, [user, loading, navigate]);
+  };
 
   const handleStartClick = () => {
-    // Navigate based on whether user exists
-    if (user) {
-      navigate('/capture');
-    } else {
-      navigate('/login');
-    }
+    // Check auth before navigating
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate('/capture');
+      } else {
+        navigate('/login');
+      }
+    });
   };
 
   return (
