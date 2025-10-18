@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/popover";
 import { RefreshCw, ImageOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { StreamDiffusionParams } from "@/lib/daydream";
+import type { StreamDiffusionParams } from "@/components/DaydreamCanvas";
 import prompts from "@/components/prompts";
 
 const TEXTURES = [

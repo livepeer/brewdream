@@ -12,8 +12,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import * as Player from "@livepeer/react/player";
-import type { StreamDiffusionParams } from "@/lib/daydream";
-import { DaydreamCanvas } from "@/components/DaydreamCanvas";
+import { daydreamClient } from "@/lib/daydreamClient";
+import { DaydreamCanvas, type StreamDiffusionParams } from "@/components/DaydreamCanvas";
 import {
   StudioRecorder,
   type StudioRecorderHandle,
@@ -907,6 +907,7 @@ export default function Capture() {
             {/* DaydreamCanvas: camera input preview (PiP in bottom-right) */}
             <div className="absolute bottom-3 right-3 w-20 h-20 rounded-2xl overflow-hidden border-2 border-white shadow-lg">
               <DaydreamCanvas
+                client={daydreamClient}
                 size={512}
                 className="w-full h-full object-cover"
                 videoSource={videoSource}
