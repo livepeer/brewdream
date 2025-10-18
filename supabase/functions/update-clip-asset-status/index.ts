@@ -1,5 +1,5 @@
 // Update clip asset status when processing is complete
-// Version: 2025-10-17-v2
+// Version: 2025-10-18-v1
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
