@@ -1,19 +1,21 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useUser } from "@/hooks/useUser";
 import {
   Camera,
   Loader2,
   Sparkles,
   Mic,
   MicOff,
+  RefreshCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import * as Player from "@livepeer/react/player";
-import type { StreamDiffusionParams } from "@/lib/daydream";
-import { DaydreamCanvas } from "@/components/DaydreamCanvas";
+import { daydreamClient } from "@/lib/daydreamClient";
+import { DaydreamCanvas, type StreamDiffusionParams } from "@/components/DaydreamCanvas";
 import {
   StudioRecorder,
   type StudioRecorderHandle,
@@ -75,7 +77,26 @@ async function saveClipToDatabase(params: {
   return clip;
 }
 
+// Read brew params from query string on initial load
+const readBrewParamsFromQuery = (searchParams: URLSearchParams): BrewParams => {
+  const prompt = searchParams.get("prompt") || "";
+  const texture = searchParams.get("texture") || null;
+  const textureWeight = parseFloat(searchParams.get("textureWeight") || "0.5");
+  const intensity = parseFloat(searchParams.get("intensity") || "5");
+  const quality = parseFloat(searchParams.get("quality") || "0.4");
+
+  return {
+    prompt,
+    texture,
+    textureWeight: isNaN(textureWeight) ? 0.5 : textureWeight,
+    intensity: isNaN(intensity) ? 5 : intensity,
+    quality: isNaN(quality) ? 0.4 : quality,
+  };
+};
+
 export default function Capture() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Controls the main UI flow through the capture process:
   // - "0-camera-selection": Initial screen for mobile devices to choose front/back camera
   // - "1-design-brew": Parameter setup screen where users configure their AI brew settings
@@ -83,15 +104,27 @@ export default function Capture() {
   // Note: The stream is always pre-loading in the background (hidden container) during
   // phases 0 and 1, then becomes visible when transitioning to phase 2
   // Transition phases: {idx+1}-{phase}-fade-out for smooth animations (fade-in handled by CSS)
+  // Determine initial UI phase based on query string and device
+  const initialUiPhase = (() => {
+    const camera = searchParams.get("camera");
+    const hasValidCamera = camera === "user" || camera === "environment";
+    
+    // If there's a valid camera in query string, skip to design brew phase
+    if (hasValidCamera) {
+      return "1-design-brew";
+    }
+    
+    // Otherwise, show camera selection on mobile, design brew on desktop
+    return hasMultipleCameras() ? "0-camera-selection" : "1-design-brew";
+  })();
+
   const [uiPhase, setUiPhase] = useState<
     | "0-camera-selection"
     | "0-camera-selection-fade-out"
     | "1-design-brew"
     | "1-design-brew-fade-out"
     | "2-stream"
-  >(
-    hasMultipleCameras() ? "0-camera-selection" : "1-design-brew"
-  );
+  >(initialUiPhase);
 
   // Helper function to transition between phases with fade effects
   const transitionToPhase = useCallback((intermediate: typeof uiPhase, timeout: number, next: typeof uiPhase) => {
@@ -108,23 +141,24 @@ export default function Capture() {
     })
   }, []);
 
-  const [cameraType, setCameraType] = useState<"user" | "environment" | null>(
-    null
-  );
+  // Read camera type from query string - only accept exact internal values
+  const [cameraType, setCameraType] = useState<"user" | "environment" | null>(() => {
+    const camera = searchParams.get("camera");
+    if (camera === "user" || camera === "environment") {
+      return camera;
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(false);
   const [streamId, setStreamId] = useState<string | null>(null);
   const [playbackId, setPlaybackId] = useState<string | null>(null);
   const [autoStartChecked, setAutoStartChecked] = useState(false);
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
 
-  // Diffusion parameters state
-  const [brewParams, setBrewParams] = useState<BrewParams>({
-    prompt: "",
-    texture: null,
-    textureWeight: 0.5,
-    intensity: 5,
-    quality: 0.4,
-  });
+  // Diffusion parameters state - initialize from query string
+  const [brewParams, setBrewParams] = useState<BrewParams>(() => 
+    readBrewParamsFromQuery(searchParams)
+  );
   const [canvasParams, setCanvasParams] = useState<StreamDiffusionParams | null>(null);
 
   const [recording, setRecording] = useState(false);
@@ -149,54 +183,13 @@ export default function Capture() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  
+  // Use the unified user hook - will redirect to login if not authenticated
+  const { user, loading: userLoading } = useUser();
 
   const onParamsError = useCallback((err: Error) => {
     toast({title: "Error", description: err.message, variant: "destructive"});
   }, [toast]);
-
-  const checkAuth = useCallback(async () => {
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        navigate("/login");
-        return;
-      }
-
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("email, email_verified")
-        .eq("id", session.user.id)
-        .single();
-
-      if (userError) {
-        console.error("Error fetching user data:", userError);
-        toast({
-          title: "Authentication error",
-          description: "Please try logging in again",
-          variant: "destructive"
-        });
-        navigate("/login");
-        return;
-      }
-
-      if (userData.email && !userData.email_verified) {
-        navigate("/login");
-      }
-    } catch (error) {
-      console.error("Error checking authentication:", error);
-      toast({
-        title: "Authentication error",
-        description: "Please try logging in again",
-        variant: "destructive"
-      });
-      navigate("/login");
-    }
-  }, [navigate, toast]);
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
 
   const initializeStream = useCallback(
     async (_type: "user" | "environment", _initialPrompt: string) => {
@@ -209,8 +202,6 @@ export default function Capture() {
   const selectCamera = useCallback(async (type: "user" | "environment") => {
     setCameraType(type);
     transitionToPhase("0-camera-selection-fade-out", 300, "1-design-brew");
-    // Reset prompt for new camera
-    setBrewParams((prev) => ({ ...prev, prompt: "" }));
   }, [transitionToPhase]);
 
   const startStream = useCallback(async () => {
@@ -642,16 +633,43 @@ export default function Capture() {
     }
   }, [playbackUrl, isPlaying]);
 
+  // Persist brew params and camera type to query string on change
+  useEffect(() => {
+    const newParams = new URLSearchParams();
+    
+    // Add camera type to query string (using exact internal values)
+    if (cameraType) {
+      newParams.set("camera", cameraType);
+    }
+    
+    // Only add params that have non-default values
+    if (brewParams.prompt) {
+      newParams.set("prompt", brewParams.prompt);
+    }
+    if (brewParams.texture) {
+      newParams.set("texture", brewParams.texture);
+    }
+    if (brewParams.textureWeight !== 0.5) {
+      newParams.set("textureWeight", brewParams.textureWeight.toString());
+    }
+    if (brewParams.intensity !== 5) {
+      newParams.set("intensity", brewParams.intensity.toString());
+    }
+    if (brewParams.quality !== 0.4) {
+      newParams.set("quality", brewParams.quality.toString());
+    }
+
+    // Update URL without triggering navigation
+    setSearchParams(newParams, { replace: true });
+  }, [brewParams, cameraType, setSearchParams]);
+
   const onDaydreamReady = useCallback(
     async ({ streamId: sid, playbackId: pid, playbackUrl: purl }) => {
       setStreamId(sid);
       setPlaybackId(pid);
       setPlaybackUrl(purl || null);
       setLoading(false);
-      // Ensure session exists
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      // Ensure session exists - user is guaranteed to exist from useUser hook
       if (!user) return;
 
       // Map UI cameraType ('user'|'environment') to DB enum ('front'|'back')
@@ -674,7 +692,7 @@ export default function Capture() {
         });
       }
     },
-    [cameraType, toast]
+    [cameraType, toast, user]
   );
   // Rely on onReady + player events; no onStatus needed
   const onDaydreamError = useCallback(
@@ -907,6 +925,7 @@ export default function Capture() {
             {/* DaydreamCanvas: camera input preview (PiP in bottom-right) */}
             <div className="absolute bottom-3 right-3 w-20 h-20 rounded-2xl overflow-hidden border-2 border-white shadow-lg">
               <DaydreamCanvas
+                client={daydreamClient}
                 size={512}
                 className="w-full h-full object-cover"
                 videoSource={videoSource}
@@ -948,6 +967,26 @@ export default function Capture() {
                 )}
               </Button>
             </div>
+
+            {/* Switch Camera Button - Only show on mobile devices */}
+            {hasMultipleCameras() && (
+              <div className="absolute top-3 right-3">
+                <Button
+                  onClick={() => {
+                    const newCamera = cameraType === "user" ? "environment" : "user";
+                    // Let DaydreamCanvas handle the camera switch
+                    setCameraType(newCamera);
+                  }}
+                  disabled={!playbackId || recording || uploadingClip}
+                  size="icon"
+                  variant="secondary"
+                  className="w-12 h-12 rounded-full shadow-lg transition-all duration-200 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 disabled:opacity-50"
+                  title="Switch camera"
+                >
+                  <RefreshCcw className="w-5 h-5" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
