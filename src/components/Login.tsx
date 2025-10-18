@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/hooks/useUser";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Mail, RotateCw, CheckCircle2 } from "lucide-react";
@@ -21,21 +22,24 @@ export function Login() {
 
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // Use the unified user hook with allowSignedOff to prevent redirect loop
+  const { user, loading: userLoading, session } = useUser({ allowSignedOff: true });
 
-  // Check existing session
+  // Update isAnonymous state based on session
   useEffect(() => {
-    const checkExistingSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session) {
-        const isAnon = (session.user as any)?.is_anonymous || false;
-        setIsAnonymous(isAnon);
-        if (!isAnon) navigate("/capture");
-      }
-    };
-    checkExistingSession();
-  }, [navigate]);
+    if (session) {
+      const isAnon = (session.user as any)?.is_anonymous || false;
+      setIsAnonymous(isAnon);
+    }
+  }, [session]);
+
+  // Redirect to capture if we already have a user (and not anonymous)
+  useEffect(() => {
+    if (!userLoading && user && !isAnonymous) {
+      navigate("/capture");
+    }
+  }, [user, userLoading, isAnonymous, navigate]);
 
   // Cleanup timer
   useEffect(() => {
@@ -64,13 +68,8 @@ export function Login() {
       const { data, error } = await supabase.auth.signInAnonymously();
       if (error) throw error;
 
-      if (data.user) {
-        const { error: insertError } = await supabase
-          .from("users")
-          .upsert({ id: data.user.id, email: null }, { onConflict: "id" });
-        if (insertError) throw insertError;
-      }
-
+      // The useUser hook will handle upserting the user to the database
+      // Just show success and navigate
       toast({ title: "Welcome!", description: "You can start creating clips right away" });
       navigate("/capture");
     } catch (error: any) {
@@ -152,24 +151,13 @@ export function Login() {
       if (event === "SIGNED_IN" && session?.user) {
         const wasAnonymous = (session.user as any)?.is_anonymous || false;
         if (!wasAnonymous) {
-          const { error: upsertError } = await supabase
-            .from("users")
-            .upsert({ id: session.user.id, email: session.user.email }, { onConflict: "id" });
-          if (upsertError) {
-            console.error("Failed to save user data on auth change:", upsertError);
-            toast({
-              title: "Error",
-              description: "Logged in but couldn't save user data. Please try again.",
-              variant: "destructive"
-            });
-            return;
-          }
+          // The useUser hook will handle upserting to the database
+          toast({
+            title: "Success!",
+            description: "Logged in successfully",
+          });
+          navigate("/capture");
         }
-        toast({
-          title: "Success!",
-          description: "Logged in successfully",
-        });
-        navigate("/capture");
       }
     });
     return () => subscription.unsubscribe();

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useUser } from "@/hooks/useUser";
 import {
   Camera,
   Loader2,
@@ -164,41 +165,13 @@ export default function Capture() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  
+  // Use the unified user hook - will redirect to login if not authenticated
+  const { user, loading: userLoading } = useUser();
 
   const onParamsError = useCallback((err: Error) => {
     toast({title: "Error", description: err.message, variant: "destructive"});
   }, [toast]);
-
-  const checkAuth = useCallback(async () => {
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      
-      if (!session || !session.user?.id) {
-        navigate("/login");
-        return;
-      }
-      
-      // Check if user exists in our users table
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("id", session.user.id)
-        .single();
-      
-      if (userError || !userData) {
-        navigate("/login");
-        return;
-      }
-    } catch (error) {
-      console.error("Error checking authentication:", error);
-      navigate("/login");
-    }
-  }, [navigate]);
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
 
   const initializeStream = useCallback(
     async (_type: "user" | "environment", _initialPrompt: string) => {
@@ -675,10 +648,7 @@ export default function Capture() {
       setPlaybackId(pid);
       setPlaybackUrl(purl || null);
       setLoading(false);
-      // Ensure session exists
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      // Ensure session exists - user is guaranteed to exist from useUser hook
       if (!user) return;
 
       // Map UI cameraType ('user'|'environment') to DB enum ('front'|'back')
@@ -701,7 +671,7 @@ export default function Capture() {
         });
       }
     },
-    [cameraType, toast]
+    [cameraType, toast, user]
   );
   // Rely on onReady + player events; no onStatus needed
   const onDaydreamError = useCallback(
