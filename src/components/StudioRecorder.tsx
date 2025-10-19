@@ -70,7 +70,6 @@ class VideoRecorder {
   private canvas: HTMLCanvasElement | null = null;
   private canvasContext: CanvasRenderingContext2D | null = null;
   private frameAnimationId: number | null = null;
-  private audioContext: AudioContext | null = null;
 
   constructor(private videoElement: HTMLVideoElement) {}
 
@@ -119,28 +118,20 @@ class VideoRecorder {
     const canvasStream = canvas.captureStream(30); // 30 fps
     console.log('Canvas stream created with', canvasStream.getTracks().length, 'video tracks');
 
-    // Capture audio from video element using Web Audio API
-    let audioTrack: MediaStreamTrack | null = null;
+    // Try to get audio from the video element if available
     try {
-      // Create audio context and connect video element
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const source = this.audioContext.createMediaElementSource(this.videoElement);
-      const destination = this.audioContext.createMediaStreamDestination();
-      
-      // Connect video audio to both the destination (for recording) and speakers (for playback)
-      source.connect(destination);
-      source.connect(this.audioContext.destination);
-      
-      // Get audio track from destination
-      const audioTracks = destination.stream.getAudioTracks();
-      if (audioTracks.length > 0) {
-        audioTrack = audioTracks[0];
-        console.log('Captured audio track using Web Audio API');
-        canvasStream.addTrack(audioTrack);
+      // Extract audio tracks from video's MediaStream
+      const videoSrcObject = (this.videoElement as any).srcObject as MediaStream | null;
+      if (videoSrcObject && videoSrcObject.getAudioTracks) {
+        const audioTracks = videoSrcObject.getAudioTracks();
+        if (audioTracks.length > 0) {
+          console.log('Found', audioTracks.length, 'audio tracks from video srcObject');
+          // Add audio tracks to the canvas stream
+          audioTracks.forEach(track => canvasStream.addTrack(track));
+        }
       }
     } catch (err) {
-      console.warn('Could not capture audio from video element:', err);
-      // Continue without audio - video recording will still work
+      console.warn('Could not extract audio tracks from video element:', err);
     }
 
     const stream = canvasStream;
@@ -229,16 +220,6 @@ class VideoRecorder {
     }
     this.canvas = null;
     this.canvasContext = null;
-
-    // Clean up audio context
-    if (this.audioContext) {
-      try {
-        await this.audioContext.close();
-      } catch (err) {
-        console.warn('Error closing audio context:', err);
-      }
-      this.audioContext = null;
-    }
 
     const durationMs = Date.now() - this.startTime;
 
