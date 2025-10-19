@@ -42,7 +42,7 @@ export interface DaydreamClient {
 }
 
 // Default stream diffusion parameters
-const DEFAULT_STREAM_DIFFUSION_PARAMS = {
+export const DEFAULT_STREAM_DIFFUSION_PARAMS = {
   model_id: 'stabilityai/sdxl-turbo',
   prompt: "psychedelia",
   negative_prompt: 'blurry, low quality, flat, 2d, distorted',

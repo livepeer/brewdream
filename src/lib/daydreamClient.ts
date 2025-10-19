@@ -55,7 +55,7 @@ export class DaydreamApiClient implements DaydreamClient {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify({ params }),
     });
 
     const data = await response.json();
