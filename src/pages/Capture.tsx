@@ -13,9 +13,9 @@ import {
   RefreshCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import * as Player from "@livepeer/react/player";
 import { supabaseDaydreamClient } from "@/lib/supabaseDaydreamClient";
 import { DaydreamCanvas, type StreamDiffusionParams } from "@/components/DaydreamCanvas";
+import { DaydreamOutputPlayer } from "@/components/DaydreamOutputPlayer";
 import {
   StudioRecorder,
   type StudioRecorderHandle,
@@ -108,12 +108,12 @@ export default function Capture() {
   const initialUiPhase = (() => {
     const camera = searchParams.get("camera");
     const hasValidCamera = camera === "user" || camera === "environment";
-    
+
     // If there's a valid camera in query string, skip to design brew phase
     if (hasValidCamera) {
       return "1-design-brew";
     }
-    
+
     // Otherwise, show camera selection on mobile, design brew on desktop
     return hasMultipleCameras() ? "0-camera-selection" : "1-design-brew";
   })();
@@ -156,7 +156,7 @@ export default function Capture() {
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
 
   // Diffusion parameters state - initialize from query string
-  const [brewParams, setBrewParams] = useState<BrewParams>(() => 
+  const [brewParams, setBrewParams] = useState<BrewParams>(() =>
     readBrewParamsFromQuery(searchParams)
   );
   const [canvasParams, setCanvasParams] = useState<StreamDiffusionParams | null>(null);
@@ -183,7 +183,7 @@ export default function Capture() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMobile = useIsMobile();
-  
+
   // Use the unified user hook - will redirect to login if not authenticated
   const { user, loading: userLoading } = useUser();
 
@@ -494,18 +494,6 @@ export default function Capture() {
     ]
   );
 
-  const src = useMemo(() => {
-    if (!playbackUrl) return null;
-    return [
-      {
-        type: "webrtc" as const,
-        src: playbackUrl,
-        mime: "video/h264" as const,
-        width: 512,
-        height: 512,
-      },
-    ];
-  }, [playbackUrl]);
 
   // Update recording timer display
   useEffect(() => {
@@ -545,7 +533,7 @@ export default function Capture() {
         };
       }
     }
-  }, [playbackUrl, src]);
+  }, [playbackUrl]);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -636,12 +624,12 @@ export default function Capture() {
   // Persist brew params and camera type to query string on change
   useEffect(() => {
     const newParams = new URLSearchParams();
-    
+
     // Add camera type to query string (using exact internal values)
     if (cameraType) {
       newParams.set("camera", cameraType);
     }
-    
+
     // Only add params that have non-default values
     if (brewParams.prompt) {
       newParams.set("prompt", brewParams.prompt);
@@ -876,7 +864,7 @@ export default function Capture() {
               onComplete={handleRecordingComplete}
               onError={handleRecordingError}
             >
-              {playbackUrl && src ? (
+              {playbackUrl ? (
                 <div
                   ref={playerContainerRef}
                   className="player-container w-full h-full [&_[data-radix-aspect-ratio-wrapper]]:!h-full [&_[data-radix-aspect-ratio-wrapper]]:!pb-0"
@@ -886,34 +874,10 @@ export default function Capture() {
                     position: "relative",
                   }}
                 >
-                  <Player.Root src={src} autoPlay lowLatency="force">
-                    <Player.Container
-                      className="w-full h-full"
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        position: "relative",
-                      }}
-                    >
-                      <Player.Video
-                        className="w-full h-full"
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                      />
-                      <Player.LoadingIndicator>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-950/50 gap-4">
-                          <Loader2 className="w-12 h-12 animate-spin text-primary" />
-                          <p className="text-sm text-neutral-300 text-center px-4 min-h-[20px]">
-                            {showSlowLoadingMessage &&
-                              "Hang tight! Stream loading can take up to 30 seconds..."}
-                          </p>
-                        </div>
-                      </Player.LoadingIndicator>
-                    </Player.Container>
-                  </Player.Root>
+                  <DaydreamOutputPlayer
+                    playbackUrl={playbackUrl}
+                    showSlowLoadingMessage={showSlowLoadingMessage}
+                  />
                 </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
