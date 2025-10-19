@@ -5,46 +5,18 @@ import React, {
   useCallback,
   useState,
 } from 'react';
-
-export interface DaydreamStream {
-  id: string;
-  output_playback_id: string;
-  whip_url: string;
-}
-
-export interface StreamDiffusionParams {
-  model_id?: string;
-  prompt: string;
-  negative_prompt?: string;
-  num_inference_steps?: number;
-  seed?: number;
-  t_index_list?: number[];
-  controlnets?: Array<{
-    enabled?: boolean;
-    model_id: string;
-    preprocessor: string;
-    preprocessor_params?: Record<string, unknown>;
-    conditioning_scale: number;
-  }>;
-  ip_adapter?: {
-    enabled?: boolean;
-    type?: 'regular' | 'faceid';
-    scale?: number;
-    weight_type?: string;
-    insightface_model_name?: 'buffalo_l';
-  };
-  ip_adapter_style_image_url?: string;
-}
-
-export interface DaydreamClient {
-  createStream(pipelineId: string, initialParams?: StreamDiffusionParams): Promise<DaydreamStream>;
-  updatePrompts(streamId: string, params: StreamDiffusionParams): Promise<void>;
-}
+import { supabase } from '@/integrations/supabase/client';
+import {
+  createDaydreamStream,
+  startWhipPublish,
+} from '@/lib/daydream';
+import type { StreamDiffusionParams } from '@/lib/daydream';
+import prompts from '@/components/prompts';
 
 // Default stream diffusion parameters
 const DEFAULT_STREAM_DIFFUSION_PARAMS = {
   model_id: 'stabilityai/sdxl-turbo',
-  prompt: "psychedelia",
+  prompt: prompts.default[0],
   negative_prompt: 'blurry, low quality, flat, 2d, distorted',
   num_inference_steps: 50,
   seed: 42,
@@ -81,82 +53,7 @@ const DEFAULT_STREAM_DIFFUSION_PARAMS = {
   },
 };
 
-/**
- * Start WHIP publish from a MediaStream to Daydream
- * Returns the RTCPeerConnection for later cleanup
- */
-async function startWhipPublish(
-  whipUrl: string,
-  stream: MediaStream
-): Promise<{ pc: RTCPeerConnection; playbackUrl: string | null }> {
-  const pc = new RTCPeerConnection({
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-    ],
-    iceCandidatePoolSize: 3,
-  });
-
-  // Add all tracks from the stream
-  stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-  // Create offer
-  const offer = await pc.createOffer({
-    offerToReceiveAudio: false,
-    offerToReceiveVideo: false,
-  });
-  await pc.setLocalDescription(offer);
-
-  // Wait for ICE gathering to complete (non-trickle ICE) with timeout
-  const ICE_TIMEOUT = 2000; // 2 second timeout - aggressive for fast UX
-
-  await Promise.race([
-    new Promise<void>((resolve) => {
-      if (pc.iceGatheringState === 'complete') {
-        resolve();
-      } else {
-        const checkState = () => {
-          if (pc.iceGatheringState === 'complete') {
-            pc.removeEventListener('icegatheringstatechange', checkState);
-            resolve();
-          }
-        };
-        pc.addEventListener('icegatheringstatechange', checkState);
-      }
-    }),
-    new Promise<void>((resolve) => setTimeout(resolve, ICE_TIMEOUT))
-  ]);
-
-  // Send offer to WHIP endpoint
-  const offerSdp = pc.localDescription!.sdp!;
-  const response = await fetch(whipUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/sdp',
-    },
-    body: offerSdp,
-  });
-
-  if (!response.ok) {
-    throw new Error(`WHIP publish failed: ${response.status} ${response.statusText}`);
-  }
-
-  // Capture low-latency WebRTC playback URL from response headers
-  const playbackUrl = response.headers.get('livepeer-playback-url') || null;
-
-  // Get answer SDP and set it
-  const answerSdp = await response.text();
-  await pc.setRemoteDescription({
-    type: 'answer',
-    sdp: answerSdp,
-  });
-
-  return { pc, playbackUrl };
-}
-
 export interface DaydreamCanvasProps {
-  client: DaydreamClient;
   className?: string;
   style?: React.CSSProperties;
   canvasRef?: React.Ref<HTMLCanvasElement>; // optional ref to the canvas element
@@ -239,7 +136,6 @@ function computeCoverDrawRect(
 }
 
 export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
-  client,
   params,
   videoSource = { type: 'blank' },
   audioSource = { type: 'silent' },
@@ -717,12 +613,20 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
       // Snapshot latest for eventual consistency; always include required defaults
       const latest = latestParamsRef.current || next;
 
-      try {
-        // Use the new updateDaydreamPrompts function
-        await client.updatePrompts(streamId, {
+      const body = {
+        streamId,
+        params: {
           ...DEFAULT_STREAM_DIFFUSION_PARAMS,
           ...latest,
+        },
+      };
+
+      try {
+        // Call edge function directly to avoid library-level defaults
+        const { error } = await supabase.functions.invoke('daydream-prompt', {
+          body,
         });
+        if (error) throw error;
       } catch (e) {
         console.error('[DaydreamCanvas] Params update failed:', e);
         onError?.(e);
@@ -738,7 +642,7 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
           });
         }
       }
-    }, [client, onError]);
+    }, [onError]);
 
     const enqueueParamsUpdate = useCallback(() => {
       pendingParamsRef.current = latestParamsRef.current;
@@ -759,16 +663,7 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
           ...(params || {}),
         };
 
-        let pipelineId: string;
-        if (initialParams.model_id === 'stabilityai/sdxl-turbo') {
-          pipelineId = initialParams.ip_adapter?.type === 'faceid' ? 'pip_SDXL-turbo-faceid' : 'pip_SDXL-turbo';
-        } else if (initialParams.model_id === 'stabilityai/sd-turbo') {
-          pipelineId = 'pip_SD-turbo';
-        } else {
-          pipelineId = 'pip_SD15';
-        }
-
-        const streamData = await client.createStream(pipelineId, initialParams);
+        const streamData = await createDaydreamStream(initialParams);
         streamIdRef.current = streamData.id;
         playbackIdRef.current = streamData.output_playback_id;
 
@@ -793,7 +688,7 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
         onError?.(e);
         throw e;
       }
-    }, [client, buildPublishStream, enqueueParamsUpdate, onError, onReady, params]);
+    }, [buildPublishStream, enqueueParamsUpdate, onError, onReady, params]);
 
     // Stop publishing and cleanup
     const stop = useCallback(async () => {
