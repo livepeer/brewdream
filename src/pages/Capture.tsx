@@ -185,7 +185,7 @@ export default function Capture() {
   const isMobile = useIsMobile();
 
   // Use the unified user hook - will redirect to login if not authenticated
-  const { user, loading: userLoading } = useUser();
+  const { user } = useUser();
 
   const onParamsError = useCallback((err: Error) => {
     toast({title: "Error", description: err.message, variant: "destructive"});
@@ -888,7 +888,7 @@ export default function Capture() {
 
             {/* DaydreamCanvas: camera input preview (PiP in bottom-right) */}
             <div className="absolute bottom-3 right-3 w-20 h-20 rounded-2xl overflow-hidden border-2 border-white shadow-lg">
-              <DaydreamCanvas
+              {user && <DaydreamCanvas
                 client={supabaseDaydreamClient}
                 size={512}
                 className="w-full h-full object-cover"
@@ -899,7 +899,7 @@ export default function Capture() {
                 params={canvasParams}
                 onReady={onDaydreamReady}
                 onError={onDaydreamError}
-              />
+              />}
             </div>
 
             {/* Microphone Toggle Button */}
