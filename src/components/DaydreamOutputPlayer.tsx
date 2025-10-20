@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import * as Player from "@livepeer/react/player";
 
 interface DaydreamOutputPlayerProps {
-  playbackUrl: string;
+  playbackUrl?: string | null;
   showSlowLoadingMessage?: boolean;
   style?: React.CSSProperties;
 }

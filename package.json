@@ -8,7 +8,8 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sdk": "tar -cf public/daydream-sdk.tar src/components/DaydreamCanvas.tsx src/components/DaydreamOutputPlayer.tsx src/lib/daydreamClient.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
