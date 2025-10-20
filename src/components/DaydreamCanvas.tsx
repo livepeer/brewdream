@@ -155,6 +155,12 @@ async function startWhipPublish(
   return { pc, playbackUrl };
 }
 
+export interface StreamInfo {
+  streamId: string;
+  playbackId: string;
+  playbackUrl: string | null;
+}
+
 export interface DaydreamCanvasProps {
   client: DaydreamClient;
   className?: string;
@@ -201,7 +207,7 @@ export interface DaydreamCanvasProps {
   // Lifecycle & behavior
   alwaysOn?: boolean; // keep alive in background on mobile (default false)
   // Events
-  onReady?: (info: { streamId: string; playbackId: string; playbackUrl: string | null }) => void;
+  onReady?: (info: StreamInfo) => void;
   onError?: (error: unknown) => void;
 }
 
