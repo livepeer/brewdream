@@ -623,32 +623,32 @@ export default function Capture() {
 
   // Persist brew params and camera type to query string on change
   useEffect(() => {
-    const newParams = new URLSearchParams();
-
-    // Add camera type to query string (using exact internal values)
-    if (cameraType) {
-      newParams.set("camera", cameraType);
-    }
-
-    // Only add params that have non-default values
-    if (brewParams.prompt) {
-      newParams.set("prompt", brewParams.prompt);
-    }
-    if (brewParams.texture) {
-      newParams.set("texture", brewParams.texture);
-    }
-    if (brewParams.textureWeight !== 0.5) {
-      newParams.set("textureWeight", brewParams.textureWeight.toString());
-    }
-    if (brewParams.intensity !== 5) {
-      newParams.set("intensity", brewParams.intensity.toString());
-    }
-    if (brewParams.quality !== 0.4) {
-      newParams.set("quality", brewParams.quality.toString());
-    }
-
     // Update URL without triggering navigation
-    setSearchParams(newParams, { replace: true });
+    setSearchParams((prev) => {
+      const newParams = new URLSearchParams(prev);
+
+      // Only add params that have non-default values
+      if (cameraType) {
+        newParams.set("camera", cameraType);
+      }
+      if (brewParams.prompt) {
+        newParams.set("prompt", brewParams.prompt);
+      }
+      if (brewParams.texture) {
+        newParams.set("texture", brewParams.texture);
+      }
+      if (brewParams.textureWeight !== 0.5) {
+        newParams.set("textureWeight", brewParams.textureWeight.toString());
+      }
+      if (brewParams.intensity !== 5) {
+        newParams.set("intensity", brewParams.intensity.toString());
+      }
+      if (brewParams.quality !== 0.4) {
+        newParams.set("quality", brewParams.quality.toString());
+      }
+
+      return newParams;
+    }, { replace: true });
   }, [brewParams, cameraType, setSearchParams]);
 
   const onDaydreamReady = useCallback(
