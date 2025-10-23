@@ -53,7 +53,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 In **Authentication** → **Email Templates**:
 
 1. Ensure "Enable Email Confirmations" is turned ON
-2. Verify the redirect URL is set correctly (should be `{{ .SiteURL }}/capture`)
+2. Verify the redirect URL is set correctly (should be `{{ .SiteURL }}/login`)
 
 ### 5. Deploy the Edge Function
 
@@ -167,6 +167,6 @@ If you continue to have issues:
 
 ---
 
-**Last Updated:** 2025-10-13  
-**Status:** Email system configured and tested  
+**Last Updated:** 2025-10-13
+**Status:** Email system configured and tested
 **Known Issues:** None (conflict error fixed)

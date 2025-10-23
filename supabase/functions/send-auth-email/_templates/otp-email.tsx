@@ -24,26 +24,33 @@ export const OtpEmail = ({
   email_action_type,
   redirect_to,
   token_hash,
-}: OtpEmailProps) => (
-  <Html>
-    <Head />
-    <Preview>Your Brewdream login code: {token}</Preview>
-    <Body style={main}>
-      <Container style={container}>
-        <Heading style={h1}>Your Login Code</Heading>
-        <Text style={text}>
-          Enter this 6-digit code to sign in to Brewdream:
-        </Text>
-        <div style={codeContainer}>
-          <Text style={code}>{token}</Text>
-        </div>
-        <Text style={{ ...text, marginTop: '24px', color: '#ababab', fontSize: '12px' }}>
-          This code will expire in 1 hour. If you didn&apos;t request this email, you can safely ignore it.
-        </Text>
-      </Container>
-    </Body>
-  </Html>
-)
+}: OtpEmailProps) => {
+  // Construct the magic link URL that redirects to /login
+  const magicLinkUrl = `${supabase_url}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${encodeURIComponent(redirect_to || '/login')}`;
+
+  return (
+    <Html>
+      <Head />
+      <Preview>Your Brewdream login link</Preview>
+      <Body style={main}>
+        <Container style={container}>
+          <Heading style={h1}>Sign in to Brewdream</Heading>
+          <Text style={text}>
+            Click the button below to sign in to your Brewdream account:
+          </Text>
+          <div style={{ marginTop: '32px', textAlign: 'center' as const }}>
+            <Link href={magicLinkUrl} style={button}>
+              Sign in to Brewdream
+            </Link>
+          </div>
+          <Text style={{ ...text, marginTop: '24px', color: '#ababab', fontSize: '12px' }}>
+            This link will expire in 1 hour. If you didn&apos;t request this email, you can safely ignore it.
+          </Text>
+        </Container>
+      </Body>
+    </Html>
+  )
+}
 
 export default OtpEmail
 
@@ -77,22 +84,17 @@ const text = {
   margin: '24px 0',
 }
 
-const codeContainer = {
-  margin: '32px 0',
-  textAlign: 'center' as const,
-}
-
-const code = {
+const button = {
   display: 'inline-block',
-  padding: '20px 40px',
-  backgroundColor: '#1a1a1a',
+  padding: '16px 32px',
+  backgroundColor: '#8B5CF6',
   color: '#ffffff',
   fontFamily:
-    "'Courier New', monospace",
-  fontSize: '32px',
+    "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif",
+  fontSize: '16px',
   fontWeight: 'bold',
-  letterSpacing: '8px',
+  textDecoration: 'none',
   borderRadius: '12px',
-  border: '2px solid #8B5CF6',
+  border: 'none',
   margin: '0',
 }
