@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -181,6 +181,7 @@ export default function Capture() {
   const clipSavedRef = useRef<boolean>(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -623,6 +624,11 @@ export default function Capture() {
 
   // Persist brew params and camera type to query string on change
   useEffect(() => {
+    // Only update search params if we're still on the capture page
+    if (location.pathname !== "/capture") {
+      return;
+    }
+
     // Update URL without triggering navigation
     setSearchParams((prev) => {
       const newParams = new URLSearchParams(prev);
@@ -649,7 +655,7 @@ export default function Capture() {
 
       return newParams;
     }, { replace: true });
-  }, [brewParams, cameraType, setSearchParams]);
+  }, [brewParams, cameraType, location.pathname, setSearchParams]);
 
   const onDaydreamReady = useCallback(
     async ({ streamId: sid, playbackId: pid, playbackUrl: purl }) => {
