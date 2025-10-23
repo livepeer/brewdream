@@ -186,11 +186,7 @@ export function DiffusionParams({
       };
     }
     handleStreamDiffusionParams(sdParams);
-  }, [handleStreamDiffusionParams, prompt, intensity, quality, textureId, textureWeight, onError]);
-
-  useEffect(() => {
-    updateBrewParams({ prompt: prompt });
-  }, [prompt, updateBrewParams]);
+  }, [handleStreamDiffusionParams, prompt, intensity, quality, textureId, textureWeight, onError, toast]);
 
   const shufflePrompt = useCallback(() => {
     const possiblePrompts = !cameraType
