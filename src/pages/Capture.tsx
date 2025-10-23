@@ -84,6 +84,7 @@ const readBrewParamsFromQuery = (searchParams: URLSearchParams): BrewParams => {
   const textureWeight = parseFloat(searchParams.get("textureWeight") || "0.5");
   const intensity = parseFloat(searchParams.get("intensity") || "5");
   const quality = parseFloat(searchParams.get("quality") || "0.4");
+  const control = parseFloat(searchParams.get("control") || "1");
 
   return {
     prompt,
@@ -91,6 +92,7 @@ const readBrewParamsFromQuery = (searchParams: URLSearchParams): BrewParams => {
     textureWeight: isNaN(textureWeight) ? 0.5 : textureWeight,
     intensity: isNaN(intensity) ? 5 : intensity,
     quality: isNaN(quality) ? 0.4 : quality,
+    control: isNaN(control) ? 1 : control,
   };
 };
 
@@ -172,6 +174,17 @@ export default function Capture() {
   const [micEnabled, setMicEnabled] = useState(false);
   const [micPermissionDenied, setMicPermissionDenied] = useState(false);
 
+  // Debug information from onDaydreamReady
+  const [debugInfo, setDebugInfo] = useState<{
+    streamId: string | null;
+    playbackId: string | null;
+    playbackUrl: string | null;
+  }>({
+    streamId: null,
+    playbackId: null,
+    playbackUrl: null,
+  });
+
   const studioRecorderRef = useRef<StudioRecorderHandle | null>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -187,9 +200,32 @@ export default function Capture() {
 
   // Use the unified user hook - will redirect to login if not authenticated
   const { user } = useUser();
+  const showAdvancedControls = useMemo(() => {
+    if (searchParams.has("debug")) {
+      return true;
+    }
+    return /@livepeer\.(org|com)$/.test(user?.email ?? "");
+  }, [user?.email, searchParams]);
 
   const onParamsError = useCallback((err: Error) => {
     toast({title: "Error", description: err.message, variant: "destructive"});
+  }, [toast]);
+
+  const copyToClipboard = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: "Copied!",
+        description: "Stream ID copied to clipboard",
+      });
+    } catch (err) {
+      console.error("Failed to copy:", err);
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy to clipboard",
+        variant: "destructive",
+      });
+    }
   }, [toast]);
 
   const initializeStream = useCallback(
@@ -652,6 +688,9 @@ export default function Capture() {
       if (brewParams.quality !== 0.4) {
         newParams.set("quality", brewParams.quality.toString());
       }
+      if (brewParams.control !== 1) {
+        newParams.set("control", brewParams.control.toString());
+      }
 
       return newParams;
     }, { replace: true });
@@ -663,6 +702,14 @@ export default function Capture() {
       setPlaybackId(pid);
       setPlaybackUrl(purl || null);
       setLoading(false);
+
+      // Store debug information
+      setDebugInfo({
+        streamId: sid,
+        playbackId: pid,
+        playbackUrl: purl || null,
+      });
+
       // Ensure session exists - user is guaranteed to exist from useUser hook
       if (!user) return;
 
@@ -818,6 +865,7 @@ export default function Capture() {
             <DiffusionParams
               cameraType={cameraType}
               brewParams={brewParams}
+              showAdvancedControls={showAdvancedControls}
               onBrewParamsChange={setBrewParams}
               handleStreamDiffusionParams={setCanvasParams}
               onError={onParamsError}
@@ -1014,10 +1062,38 @@ export default function Capture() {
             <DiffusionParams
               cameraType={cameraType}
               brewParams={brewParams}
+              showAdvancedControls={showAdvancedControls}
               onBrewParamsChange={setBrewParams}
               handleStreamDiffusionParams={setCanvasParams}
               onError={onParamsError}
             />
+
+            {/* Debug Information */}
+            {showAdvancedControls && debugInfo.streamId && (
+              <div className="bg-neutral-900 border border-neutral-700 rounded-lg p-3 text-xs">
+                <div className="text-neutral-300 font-medium mb-2">Debug Info</div>
+                <div className="space-y-1 text-neutral-400">
+                  <div className="flex items-center gap-2">
+                    <span className="text-neutral-500">Stream ID:</span>
+                    <button
+                      onClick={() => copyToClipboard(debugInfo.streamId!)}
+                      className="text-blue-400 hover:text-blue-300 underline cursor-pointer"
+                      title="Click to copy"
+                    >
+                      {debugInfo.streamId}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-neutral-500">Playback ID:</span>
+                    <span className="text-neutral-300">{debugInfo.playbackId}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-neutral-500">Playback URL:</span>
+                    <span className="text-neutral-300 break-all">{debugInfo.playbackUrl}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

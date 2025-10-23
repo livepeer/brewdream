@@ -61,11 +61,13 @@ export interface BrewParams {
   textureWeight: number;
   intensity: number;
   quality: number;
+  control: number;
 }
 
 interface DiffusionParamsProps {
   cameraType: "user" | "environment" | null;
   brewParams: BrewParams;
+  showAdvancedControls?: boolean;
   onBrewParamsChange: (brewParams: BrewParams) => void;
   handleStreamDiffusionParams: (streamParams: StreamDiffusionParams) => void;
   onError?: (error: Error) => void;
@@ -101,6 +103,7 @@ const calculateTIndexList = (intensity: number, quality: number): number[] => {
 export function DiffusionParams({
   cameraType,
   brewParams,
+  showAdvancedControls = false,
   onBrewParamsChange,
   handleStreamDiffusionParams,
   onError,
@@ -114,6 +117,7 @@ export function DiffusionParams({
   const textureWeight = useMemo(() => [brewParams.textureWeight], [brewParams.textureWeight]);
   const intensity = useMemo(() => [brewParams.intensity], [brewParams.intensity]);
   const quality = useMemo(() => [brewParams.quality], [brewParams.quality]);
+  const control = useMemo(() => [brewParams.control ?? 1], [brewParams.control]);
 
   const updateBrewParams = useCallback((updates: Partial<BrewParams>) => {
     const newBrewParams = { ...brewParams, ...updates };
@@ -135,21 +139,21 @@ export function DiffusionParams({
           model_id: "xinsir/controlnet-depth-sdxl-1.0",
           preprocessor: "depth_tensorrt",
           preprocessor_params: {},
-          conditioning_scale: 0.6,
+          conditioning_scale: 0.6 * control[0],
         },
         {
           enabled: true,
           model_id: "xinsir/controlnet-canny-sdxl-1.0",
           preprocessor: "canny",
           preprocessor_params: {},
-          conditioning_scale: 0.3,
+          conditioning_scale: 0.3 * control[0],
         },
         {
           enabled: true,
           model_id: "xinsir/controlnet-tile-sdxl-1.0",
           preprocessor: "feedback",
           preprocessor_params: {},
-          conditioning_scale: 0.2,
+          conditioning_scale: 0.2 * control[0],
         },
       ],
       ip_adapter: {
@@ -186,7 +190,7 @@ export function DiffusionParams({
       };
     }
     handleStreamDiffusionParams(sdParams);
-  }, [handleStreamDiffusionParams, prompt, intensity, quality, textureId, textureWeight, onError, toast]);
+  }, [handleStreamDiffusionParams, prompt, intensity, quality, control, textureId, textureWeight, onError, toast]);
 
   const shufflePrompt = useCallback(() => {
     const possiblePrompts = !cameraType
@@ -223,6 +227,10 @@ export function DiffusionParams({
 
   const handleQualityChange = useCallback((val: number[]) => {
     updateBrewParams({ quality: val[0] });
+  }, [updateBrewParams]);
+
+  const handleControlChange = useCallback((val: number[]) => {
+    updateBrewParams({ control: val[0] });
   }, [updateBrewParams]);
 
   return (
@@ -367,6 +375,22 @@ export function DiffusionParams({
           className="w-full accent-neutral-400 h-6"
         />
       </div>
+
+      {showAdvancedControls && (
+        <div>
+          <label className="text-sm font-medium mb-2 block text-neutral-300">
+            Control: {control[0].toFixed(2)}
+          </label>
+          <Slider
+            value={control}
+            onValueChange={handleControlChange}
+            min={0}
+            max={1}
+            step={0.05}
+            className="w-full accent-neutral-400 h-6"
+          />
+        </div>
+      )}
     </div>
   );
 }
