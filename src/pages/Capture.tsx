@@ -402,11 +402,7 @@ export default function Capture() {
   const saveRecordingToClip = useCallback(
     async (result: StudioRecordingResult, complete: boolean) => {
       try {
-        // Skip if we already saved the clip early (via progress callback)
-        if (clipSavedRef.current) {
-          console.log("Clip already saved in progress callback, skipping complete handler");
-          return;
-        }
+        console.log("saveRecordingToClip called", { complete, hasRawUrl: !!result.rawUploadedFileUrl });
 
         // Get session ID
         const { data: sessionData, error: sessionError } = await supabase
@@ -450,17 +446,22 @@ export default function Capture() {
           tIndexList: canvasParams?.t_index_list || [],
         });
 
-        // Set flag to avoid double saving on uploadDone/complete
-        clipSavedRef.current = true;
+        const clipUrl = `/clip/${clip.id}`;
+        console.log("Clip saved to database, navigating to:", clipUrl);
 
         toast({
           title: "Clip created!",
           description: "Redirecting to your clip...",
         });
 
-        navigate(`/clip/${clip.id}`);
+        // Navigate immediately - don't wait for anything else
+        console.log("Calling navigate() now");
+        navigate(clipUrl);
+        console.log("navigate() called");
       } catch (error: unknown) {
         console.error("Error saving clip to database:", error);
+        // Reset the flag on error so user can try again
+        clipSavedRef.current = false;
         toast({
           title: "Error creating clip",
           description: error instanceof Error ? error.message : String(error),
@@ -477,8 +478,17 @@ export default function Capture() {
 
   const handleRecordingComplete = useCallback(
     async (result: StudioRecordingResult) => {
+      console.log("handleRecordingComplete called", { result, clipSaved: clipSavedRef.current });
+      // Don't call saveRecordingToClip if we already saved via handleUploadDone
+      if (clipSavedRef.current) {
+        console.log("Skipping handleRecordingComplete because clip already saved");
+        return;
+      }
+      
+      // Set flag immediately to prevent race condition
+      clipSavedRef.current = true;
       console.log("Recording complete, saving to database...", result);
-      saveRecordingToClip(result, true);
+      await saveRecordingToClip(result, true);
     },
     [saveRecordingToClip]
   );
@@ -486,14 +496,24 @@ export default function Capture() {
   // StudioRecorder callback: Handle upload completion and optimistically create clip
   const handleUploadDone = useCallback(
     async (result: StudioRecordingResult) => {
+      console.log("handleUploadDone called", { hasRawUrl: !!result.rawUploadedFileUrl, clipSaved: clipSavedRef.current });
+      
       // Only save early if we have rawUploadedFileUrl
       if (!result.rawUploadedFileUrl) {
         console.log("No rawUploadedFileUrl, will wait for full completion");
         return;
       }
 
+      // Don't save if already saved
+      if (clipSavedRef.current) {
+        console.log("Skipping handleUploadDone because clip already saved");
+        return;
+      }
+
+      // Set flag immediately to prevent race condition
+      clipSavedRef.current = true;
       console.log("Upload complete, saving clip optimistically with raw URL:", result.rawUploadedFileUrl);
-      saveRecordingToClip(result, false);
+      await saveRecordingToClip(result, false);
     },
     [saveRecordingToClip]
   );

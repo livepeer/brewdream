@@ -41,15 +41,20 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
 
   useEffect(() => {
     let mounted = true;
+    let hasNavigated = false;
+
+    console.log('[useUser] Effect running, allowSignedOff:', allowSignedOff);
 
     const syncUser = async () => {
+      console.log('[useUser] syncUser called, mounted:', mounted, 'hasNavigated:', hasNavigated);
       try {
         // Get current session
         const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
           console.error('Error getting session:', sessionError);
-          if (!allowSignedOff) {
+          if (!allowSignedOff && !hasNavigated) {
+            hasNavigated = true;
             navigate('/login');
           }
           return;
@@ -62,7 +67,9 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
             setUser(null);
             setLoading(false);
             
-            if (!allowSignedOff) {
+            if (!allowSignedOff && !hasNavigated) {
+              console.log('[useUser] Navigating to login (session error)');
+              hasNavigated = true;
               navigate('/login');
             }
           }
@@ -161,7 +168,8 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
           console.error('All upsert attempts failed:', lastError);
           setLoading(false);
           
-          if (!allowSignedOff) {
+          if (!allowSignedOff && !hasNavigated) {
+            hasNavigated = true;
             navigate('/login');
           }
         }
@@ -171,7 +179,8 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
         if (mounted) {
           setLoading(false);
           
-          if (!allowSignedOff) {
+          if (!allowSignedOff && !hasNavigated) {
+            hasNavigated = true;
             navigate('/login');
           }
         }
@@ -181,7 +190,8 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
     syncUser();
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[useUser] Auth state changed:', event, 'mounted:', mounted);
       if (!mounted) return;
       
       // Re-run the sync when auth state changes
@@ -192,7 +202,8 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [allowSignedOff, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowSignedOff]); // navigate is stable and should not be in deps
 
   return { user, loading, session };
 }
