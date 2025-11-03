@@ -1,0 +1,43 @@
+---
+alwaysApply: true
+---
+# Brewdream Project Rules
+
+## Context First
+- **Always read `VIBEME.md` before making changes** - it contains architecture, patterns, and critical constraints
+- Check `docs/` folder for detailed implementation guides
+- Reference `PRD.md` for product requirements
+
+## Update Responsibility
+**You must update `VIBEME.md` after**:
+- Architectural changes (new APIs, state management, major refactors)
+- Database schema changes
+- New user flows or routing
+- Design system updates
+
+**Create docs in `docs/` for**:
+- Complex feature implementations
+- API integration details
+- Debugging solutions worth preserving
+
+## Hard Constraints (Non-Negotiable)
+- **No client-side API keys** - All Daydream/Livepeer calls via Supabase Edge Functions
+- **WebRTC-only playback** - `lowLatency=force`, no HLS fallback
+- **Canvas-based recording** - For all browsers (consistent, Safari-compatible). Encapsulated in `DaydreamCanvas`
+- **Mobile-first** - Primary target is event attendees on phones
+- **Browser WHIP publish** - Direct WebRTC to Daydream's `whip_url`
+
+## Key Patterns
+- **Recording**: `StudioRecorder` component wraps video → canvas frames @ 30fps → `MediaRecorder`
+- **API calls**: Always proxy through `supabase/functions/` (never direct)
+- **UI components**: Use shadcn/ui, follow dark theme with gradients
+- **State**: Local `useState`, direct Supabase queries (no React Query)
+
+## File Locations
+- Core logic: `src/lib/daydream.ts`, `src/components/StudioRecorder.tsx`
+- Main UI: `src/pages/Capture.tsx`, `src/pages/ClipView.tsx`
+- API proxies: `supabase/functions/`
+- Detailed docs: `docs/DAYDREAM_API_GUIDE.md`, `docs/RECORDING_IMPLEMENTATION.md`, and others
+
+## Token Efficiency
+Keep documentation concise - tokens cost money. See `docs/DOCUMENTATION_GUIDELINES.md` if needed.

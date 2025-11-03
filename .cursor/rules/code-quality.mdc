@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+- Write clean code.
+- Create abstractions to reduce duplication and single-file/function complexity
+- Omit obvious comments. e.g. ones describing what the next line does
+- Inlcude relevant comments. e.g. explaining what a function or a complex code section does.
