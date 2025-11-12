@@ -81,78 +81,255 @@ export const DEFAULT_STREAM_DIFFUSION_PARAMS = {
   },
 };
 
-/**
- * Start WHIP publish from a MediaStream to Daydream
- * Returns the RTCPeerConnection for later cleanup
- */
+// Add retry utility function with 4xx error detection
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxRetries: number;
+    baseDelayMs: number;
+    onRetry?: (attempt: number, error: unknown) => void;
+  }
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= options.maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      // Don't retry on 4xx errors (client errors)
+      if (error instanceof Error && error.message.includes('4')) {
+        const statusMatch = error.message.match(/\b([4]\d{2})\b/);
+        if (statusMatch) {
+          throw error; // Fail immediately on 4xx
+        }
+      }
+      // Also check if it's a fetch error with status
+      if (error && typeof error === 'object' && 'status' in error) {
+        const status = (error as { status: number }).status;
+        if (status >= 400 && status < 500) {
+          throw error; // Fail immediately on 4xx
+        }
+      }
+
+      if (attempt < options.maxRetries) {
+        const delay = options.baseDelayMs * Math.pow(2, attempt);
+        options.onRetry?.(attempt + 1, error);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
+// Enhanced WHIP publish with retry support
 async function startWhipPublish(
   whipUrl: string,
-  stream: MediaStream
+  stream: MediaStream,
+  options: {
+    maxRetries?: number;
+    retryDelayBaseMs?: number;
+    onRetry?: (attempt: number, error: unknown) => void;
+    onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
+    onRetryLimitExceeded?: () => void;
+  } = {}
 ): Promise<{ pc: RTCPeerConnection; playbackUrl: string | null }> {
-  const pc = new RTCPeerConnection({
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
-    ],
-    iceCandidatePoolSize: 3,
-  });
+  const maxRetries = options.maxRetries ?? 2;
+  const retryDelayBaseMs = options.retryDelayBaseMs ?? 1000;
+  let retryCount = 0;
+  let lastRetryTime = 0;
+  const RETRY_RESET_SECONDS = 10;
 
-  // Add all tracks from the stream
-  stream.getTracks().forEach(track => pc.addTrack(track, stream));
+  const attemptConnection = async (): Promise<{ pc: RTCPeerConnection; playbackUrl: string | null }> => {
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+      ],
+      iceCandidatePoolSize: 3,
+    });
 
-  // Create offer
-  const offer = await pc.createOffer({
-    offerToReceiveAudio: false,
-    offerToReceiveVideo: false,
-  });
-  await pc.setLocalDescription(offer);
+    // Set up connection state monitoring
+    let disconnectedGraceTimeout: ReturnType<typeof setTimeout> | null = null;
+    let connectionEstablished = false;
 
-  // Wait for ICE gathering to complete (non-trickle ICE) with timeout
-  const ICE_TIMEOUT = 2000; // 2 second timeout - aggressive for fast UX
+    pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
+      options.onConnectionStateChange?.(state);
 
-  await Promise.race([
-    new Promise<void>((resolve) => {
-      if (pc.iceGatheringState === 'complete') {
-        resolve();
-      } else {
-        const checkState = () => {
-          if (pc.iceGatheringState === 'complete') {
-            pc.removeEventListener('icegatheringstatechange', checkState);
-            resolve();
+      switch (state) {
+        case 'connected':
+          connectionEstablished = true;
+          if (disconnectedGraceTimeout) {
+            clearTimeout(disconnectedGraceTimeout);
+            disconnectedGraceTimeout = null;
           }
-        };
-        pc.addEventListener('icegatheringstatechange', checkState);
+          break;
+        case 'disconnected':
+          connectionEstablished = false;
+          if (disconnectedGraceTimeout) {
+            clearTimeout(disconnectedGraceTimeout);
+            disconnectedGraceTimeout = null;
+          }
+          try {
+            pc.restartIce();
+          } catch {
+            // ICE restart failed, will retry connection
+          }
+          // Grace period before considering it a failure
+          disconnectedGraceTimeout = setTimeout(() => {
+            if (pc.connectionState === 'disconnected') {
+              const now = Date.now();
+              // Reset retry count if enough time has passed since last retry
+              if (now - lastRetryTime > RETRY_RESET_SECONDS * 1000) {
+                retryCount = 0;
+              }
+
+              if (retryCount < maxRetries) {
+                retryCount++;
+                lastRetryTime = now;
+                const delay = retryDelayBaseMs * Math.pow(2, retryCount - 1);
+                options.onRetry?.(retryCount, new Error('Connection disconnected'));
+                setTimeout(() => {
+                  attemptConnection().catch(() => {
+                    if (retryCount >= maxRetries) {
+                      options.onRetryLimitExceeded?.();
+                    }
+                  });
+                }, delay);
+              } else {
+                options.onRetryLimitExceeded?.();
+              }
+            }
+          }, 2000);
+          break;
+        case 'failed': {
+          connectionEstablished = false;
+          if (disconnectedGraceTimeout) {
+            clearTimeout(disconnectedGraceTimeout);
+            disconnectedGraceTimeout = null;
+          }
+
+          const now = Date.now();
+          // Reset retry count if enough time has passed since last retry
+          if (now - lastRetryTime > RETRY_RESET_SECONDS * 1000) {
+            retryCount = 0;
+          }
+
+          if (retryCount < maxRetries) {
+            retryCount++;
+            lastRetryTime = now;
+            const delay = retryDelayBaseMs * Math.pow(2, retryCount - 1);
+            options.onRetry?.(retryCount, new Error('Connection failed'));
+            setTimeout(() => {
+              attemptConnection().catch(() => {
+                if (retryCount >= maxRetries) {
+                  options.onRetryLimitExceeded?.();
+                }
+              });
+            }, delay);
+          } else {
+            options.onRetryLimitExceeded?.();
+          }
+          break;
+        }
+        case 'closed':
+          connectionEstablished = false;
+          if (disconnectedGraceTimeout) {
+            clearTimeout(disconnectedGraceTimeout);
+            disconnectedGraceTimeout = null;
+          }
+          break;
       }
-    }),
-    new Promise<void>((resolve) => setTimeout(resolve, ICE_TIMEOUT))
-  ]);
+    };
 
-  // Send offer to WHIP endpoint
-  const offerSdp = pc.localDescription!.sdp!;
-  const response = await fetch(whipUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/sdp',
-    },
-    body: offerSdp,
-  });
+    // Handle ICE connection state changes
+    pc.oniceconnectionstatechange = () => {
+      if (
+        (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') &&
+        retryCount < maxRetries
+      ) {
+        try {
+          pc.restartIce();
+        } catch {
+          // ICE restart failed, will retry connection
+        }
+      }
+    };
 
-  if (!response.ok) {
-    throw new Error(`WHIP publish failed: ${response.status} ${response.statusText}`);
-  }
+    // Add all tracks from the stream
+    stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-  // Capture low-latency WebRTC playback URL from response headers
-  const playbackUrl = response.headers.get('livepeer-playback-url') || null;
+    // Create offer
+    const offer = await pc.createOffer({
+      offerToReceiveAudio: false,
+      offerToReceiveVideo: false,
+    });
+    await pc.setLocalDescription(offer);
 
-  // Get answer SDP and set it
-  const answerSdp = await response.text();
-  await pc.setRemoteDescription({
-    type: 'answer',
-    sdp: answerSdp,
-  });
+    // Wait for ICE gathering to complete (non-trickle ICE) with timeout
+    const ICE_TIMEOUT = 2000;
 
-  return { pc, playbackUrl };
+    await Promise.race([
+      new Promise<void>((resolve) => {
+        if (pc.iceGatheringState === 'complete') {
+          resolve();
+        } else {
+          const checkState = () => {
+            if (pc.iceGatheringState === 'complete') {
+              pc.removeEventListener('icegatheringstatechange', checkState);
+              resolve();
+            }
+          };
+          pc.addEventListener('icegatheringstatechange', checkState);
+        }
+      }),
+      new Promise<void>((resolve) => setTimeout(resolve, ICE_TIMEOUT))
+    ]);
+
+    // Send offer to WHIP endpoint
+    const offerSdp = pc.localDescription!.sdp!;
+    const response = await fetch(whipUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/sdp',
+      },
+      body: offerSdp,
+    });
+
+    if (!response.ok) {
+      // Don't retry on 4xx errors
+      if (response.status >= 400 && response.status < 500) {
+        throw new Error(`WHIP publish failed (non-retryable): ${response.status} ${response.statusText}`);
+      }
+      throw new Error(`WHIP publish failed: ${response.status} ${response.statusText}`);
+    }
+
+    // Capture low-latency WebRTC playback URL from response headers
+    const playbackUrl = response.headers.get('livepeer-playback-url') || null;
+
+    // Get answer SDP and set it
+    const answerSdp = await response.text();
+    await pc.setRemoteDescription({
+      type: 'answer',
+      sdp: answerSdp,
+    });
+
+    retryCount = 0; // Reset on successful initial connection
+    lastRetryTime = 0; // Reset timestamp on success
+    return { pc, playbackUrl };
+  };
+
+  // Initial attempt with retry wrapper for initial connection failures
+  return retryWithBackoff(
+    attemptConnection,
+    {
+      maxRetries,
+      baseDelayMs: retryDelayBaseMs,
+      onRetry: options.onRetry,
+    }
+  );
 }
 
 export interface StreamInfo {
@@ -209,6 +386,9 @@ export interface DaydreamCanvasProps {
   // Events
   onReady?: (info: StreamInfo) => void;
   onError?: (error: unknown) => void;
+  onWhipRetry?: (attempt: number, error: unknown) => void;
+  onWhipRetryLimitExceeded?: () => void;
+  onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
 }
 
 // Utility: detect mobile-ish environments (for background auto-stop defaults)
@@ -258,6 +438,9 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
   alwaysOn = false,
   onReady,
   onError,
+  onWhipRetry,
+  onWhipRetryLimitExceeded,
+  onConnectionStateChange,
 }) => {
     // Derive video source settings for stable dependencies
     const sourceVideoStream = videoSource.type === 'stream' ? videoSource.stream : null;
@@ -724,13 +907,22 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
       const latest = latestParamsRef.current || next;
 
       try {
-        // Use the new updateDaydreamPrompts function
-        await client.updatePrompts(streamId, {
-          ...DEFAULT_STREAM_DIFFUSION_PARAMS,
-          ...latest,
-        });
+        // Param updates with retry logic (3 retries, exponential backoff starting at 1s)
+        await retryWithBackoff(
+          () => client.updatePrompts(streamId, {
+            ...DEFAULT_STREAM_DIFFUSION_PARAMS,
+            ...latest,
+          }),
+          {
+            maxRetries: 3,
+            baseDelayMs: 1000,
+            onRetry: (attempt, error) => {
+              console.warn(`[DaydreamCanvas] Params update retry ${attempt}/3:`, error);
+            },
+          }
+        );
       } catch (e) {
-        console.error('[DaydreamCanvas] Params update failed:', e);
+        console.error('[DaydreamCanvas] Params update failed after retries:', e);
         onError?.(e);
       } finally {
         paramsInFlightRef.current = false;
@@ -757,9 +949,8 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
       if (pcRef.current) return; // already running
       try {
         setIsStarted(true);
-        // creating_stream
 
-        // Create stream with initial params FIRST
+        // Create stream with initial params FIRST (with retry)
         const initialParams: StreamDiffusionParams = {
           ...DEFAULT_STREAM_DIFFUSION_PARAMS,
           ...(params || {}),
@@ -774,13 +965,44 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
           pipelineId = 'pip_SD15';
         }
 
-        const streamData = await client.createStream(pipelineId, initialParams);
+        // Stream creation with retry logic (3 retries, exponential backoff starting at 1s)
+        const streamData = await retryWithBackoff(
+          () => client.createStream(pipelineId, initialParams),
+          {
+            maxRetries: 3,
+            baseDelayMs: 1000,
+            onRetry: (attempt, error) => {
+              console.warn(`[DaydreamCanvas] Stream creation retry ${attempt}/3:`, error);
+            },
+          }
+        );
+
         streamIdRef.current = streamData.id;
         playbackIdRef.current = streamData.output_playback_id;
 
-        // Immediately start WHIP publish (and capture playback URL from headers)
+        // WHIP publish with retry logic (2 retries, exponential backoff starting at 1s)
         const publishStream = await buildPublishStream();
-        const { pc, playbackUrl } = await startWhipPublish(streamData.whip_url, publishStream);
+        const { pc, playbackUrl } = await startWhipPublish(
+          streamData.whip_url,
+          publishStream,
+          {
+            maxRetries: 2,
+            retryDelayBaseMs: 1000,
+            onRetry: (attempt, error) => {
+              console.warn(`[DaydreamCanvas] WHIP connection retry ${attempt}/2:`, error);
+              onWhipRetry?.(attempt, error);
+            },
+            onRetryLimitExceeded: () => {
+              console.error('[DaydreamCanvas] WHIP retry limit exceeded');
+              onWhipRetryLimitExceeded?.();
+              onError?.(new Error('WHIP connection failed after retries'));
+            },
+            onConnectionStateChange: (state) => {
+              onConnectionStateChange?.(state);
+            },
+          }
+        );
+
         pcRef.current = pc;
         playbackUrlRef.current = playbackUrl;
 
@@ -791,15 +1013,13 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
         readyForParamUpdatesRef.current = false;
         window.setTimeout(() => {
           readyForParamUpdatesRef.current = true;
-          // Kick an update with the latest params on gate open
           enqueueParamsUpdate();
         }, 3000);
       } catch (e) {
-        // error
         onError?.(e);
         throw e;
       }
-    }, [client, buildPublishStream, enqueueParamsUpdate, onError, onReady, params]);
+    }, [client, buildPublishStream, enqueueParamsUpdate, onError, onReady, params, onWhipRetry, onWhipRetryLimitExceeded, onConnectionStateChange]);
 
     // Stop publishing and cleanup
     const stop = useCallback(async () => {
