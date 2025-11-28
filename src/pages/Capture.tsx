@@ -163,6 +163,7 @@ export default function Capture() {
     readBrewParamsFromQuery(searchParams)
   );
   const [canvasParams, setCanvasParams] = useState<StreamDiffusionParams | null>(null);
+  const [isJsonValid, setIsJsonValid] = useState(true);
 
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -250,10 +251,17 @@ export default function Capture() {
         variant: "destructive",
       });
       return;
-    } else if (!brewParams.prompt.trim()) {
+    } else if (pipeline === 'streamdiffusion' && !brewParams.prompt.trim()) {
       toast({
         title: "Error",
         description: "Please enter a prompt",
+        variant: "destructive",
+      });
+      return;
+    } else if (pipeline !== 'streamdiffusion' && !isJsonValid) {
+      toast({
+        title: "Error",
+        description: "Please enter valid JSON",
         variant: "destructive",
       });
       return;
@@ -261,7 +269,7 @@ export default function Capture() {
 
     setLoading(false); // Ensure loading is false BEFORE transitioning
     transitionToPhase("1-design-brew-fade-out", 300, "2-stream");
-  }, [cameraType, brewParams.prompt, toast, transitionToPhase]);
+  }, [cameraType, brewParams.prompt, pipeline, isJsonValid, toast, transitionToPhase]);
 
   // Auto-start camera on desktop (non-mobile devices)
   useEffect(() => {
@@ -873,6 +881,7 @@ export default function Capture() {
               onBrewParamsChange={setBrewParams}
               handleStreamDiffusionParams={setCanvasParams}
               onError={onParamsError}
+              onJsonValidityChange={setIsJsonValid}
             />
           </div>
         </div>
@@ -882,7 +891,9 @@ export default function Capture() {
           <div className="max-w-md mx-auto">
             <Button
               onClick={startStream}
-              disabled={brewParams.prompt.length < 3}
+              disabled={pipeline === 'streamdiffusion'
+                ? brewParams.prompt.length < 3
+                : !isJsonValid}
               className="w-full h-16 bg-gradient-to-r from-neutral-200 to-neutral-500 text-neutral-900 font-semibold text-lg rounded-2xl hover:from-neutral-300 hover:to-neutral-600 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <span className="flex items-center gap-3">
@@ -1071,6 +1082,7 @@ export default function Capture() {
               onBrewParamsChange={setBrewParams}
               handleStreamDiffusionParams={setCanvasParams}
               onError={onParamsError}
+              onJsonValidityChange={setIsJsonValid}
             />
 
             {/* Debug Information */}

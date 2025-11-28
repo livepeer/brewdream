@@ -74,6 +74,7 @@ interface DiffusionParamsProps {
   onBrewParamsChange: (brewParams: BrewParams) => void;
   handleStreamDiffusionParams: (streamParams: StreamDiffusionParams) => void;
   onError?: (error: Error) => void;
+  onJsonValidityChange?: (isValid: boolean) => void;
 }
 
 const calculateTIndexList = (intensity: number, quality: number): number[] => {
@@ -110,6 +111,7 @@ export function DiffusionParams({
   onBrewParamsChange,
   handleStreamDiffusionParams,
   onError,
+  onJsonValidityChange,
 }: DiffusionParamsProps) {
   const [searchParams] = useSearchParams();
   const [texturePopoverOpen, setTexturePopoverOpen] = useState(false);
@@ -133,6 +135,10 @@ export function DiffusionParams({
   const [isJsonValid, setIsJsonValid] = useState(true);
 
   useEffect(() => {
+    onJsonValidityChange?.(isJsonValid);
+  }, [isJsonValid, onJsonValidityChange]);
+
+  useEffect(() => {
     if (pipeline !== 'streamdiffusion') {
         try {
             const parsed = JSON.parse(customParamsJson);
@@ -143,6 +149,7 @@ export function DiffusionParams({
         }
         return;
     }
+    setIsJsonValid(true);
     // Compute new stream params
     let sdParams: StreamDiffusionParams = {
       model_id: "stabilityai/sdxl-turbo",
