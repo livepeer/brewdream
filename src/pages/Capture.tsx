@@ -151,6 +151,7 @@ export default function Capture() {
     }
     return null;
   });
+  const pipeline = searchParams.get("pipeline") || "streamdiffusion";
   const [loading, setLoading] = useState(false);
   const [streamId, setStreamId] = useState<string | null>(null);
   const [playbackId, setPlaybackId] = useState<string | null>(null);
@@ -665,36 +666,39 @@ export default function Capture() {
       return;
     }
 
-    // Update URL without triggering navigation
-    setSearchParams((prev) => {
-      const newParams = new URLSearchParams(prev);
+    const newParams = new URLSearchParams(searchParams);
 
-      // Only add params that have non-default values
-      if (cameraType) {
-        newParams.set("camera", cameraType);
-      }
-      if (brewParams.prompt) {
-        newParams.set("prompt", brewParams.prompt);
-      }
-      if (brewParams.texture) {
-        newParams.set("texture", brewParams.texture);
-      }
-      if (brewParams.textureWeight !== 0.5) {
-        newParams.set("textureWeight", brewParams.textureWeight.toString());
-      }
-      if (brewParams.intensity !== 5) {
-        newParams.set("intensity", brewParams.intensity.toString());
-      }
-      if (brewParams.quality !== 0.4) {
-        newParams.set("quality", brewParams.quality.toString());
-      }
-      if (brewParams.control !== 1) {
-        newParams.set("control", brewParams.control.toString());
-      }
+    if (cameraType) {
+      newParams.set("camera", cameraType);
+    }
+    if (brewParams.prompt) {
+      newParams.set("prompt", brewParams.prompt);
+    }
+    if (brewParams.texture) {
+      newParams.set("texture", brewParams.texture);
+    }
+    if (brewParams.textureWeight !== 0.5) {
+      newParams.set("textureWeight", brewParams.textureWeight.toString());
+    }
+    if (brewParams.intensity !== 5) {
+      newParams.set("intensity", brewParams.intensity.toString());
+    }
+    if (brewParams.quality !== 0.4) {
+      newParams.set("quality", brewParams.quality.toString());
+    }
+    if (brewParams.control !== 1) {
+      newParams.set("control", brewParams.control.toString());
+    }
 
-      return newParams;
-    }, { replace: true });
-  }, [brewParams, cameraType, location.pathname, setSearchParams]);
+    let queryString = newParams.toString();
+    queryString = queryString.replace(/=&/g, '&').replace(/=$/, '');
+    const currentQueryString = searchParams.toString().replace(/=&/g, '&').replace(/=$/, '');
+
+    // Only navigate if query string actually changed
+    if (queryString !== currentQueryString) {
+      navigate(`${location.pathname}${queryString ? '?' + queryString : ''}`, { replace: true });
+    }
+  }, [brewParams, cameraType, location.pathname, navigate, searchParams]);
 
   const onDaydreamReady = useCallback(
     async ({ streamId: sid, playbackId: pid, playbackUrl: purl }) => {
@@ -951,6 +955,7 @@ export default function Capture() {
                   micEnabled ? { type: "microphone" } : { type: "silent" }
                 }
                 params={canvasParams}
+                pipeline={pipeline}
                 onReady={onDaydreamReady}
                 onError={onDaydreamError}
               />}

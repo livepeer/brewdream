@@ -14,11 +14,11 @@ export class DaydreamApiClient implements DaydreamClient {
   }
 
   /**
-   * Create a new Daydream stream with the StreamDiffusion pipeline
-   * If initialParams provided, they are sent as pipeline_params to Daydream
+   * Create a new Daydream stream with the specified pipeline
+   * If initialParams provided, they are sent as params to Daydream
    */
-  async createStream(pipelineId: string, initialParams?: StreamDiffusionParams): Promise<DaydreamStream> {
-    console.log('[DAYDREAM] Creating stream with pipelineId:', pipelineId, 'and initialParams:', JSON.stringify(initialParams, null, 2));
+  async createStream(pipeline: string, initialParams?: StreamDiffusionParams): Promise<DaydreamStream> {
+    console.log('[DAYDREAM] Creating stream with pipeline:', pipeline, 'and initialParams:', JSON.stringify(initialParams, null, 2));
     const response = await fetch(`${this.baseUrl}/v1/streams`, {
       method: 'POST',
       headers: {
@@ -26,8 +26,8 @@ export class DaydreamApiClient implements DaydreamClient {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        pipeline_id: pipelineId,
-        pipeline_params: initialParams
+        pipeline: pipeline,
+        params: initialParams
       }),
     });
 

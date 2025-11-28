@@ -217,6 +217,15 @@ Two modes: **Anonymous** (instant access) + **Email OTP** (for coffee tickets)
 
 ## 🛠️ Development Patterns
 
+### Code Consistency
+- **Follow established patterns** - When a pattern exists in the codebase, use it consistently
+- **Don't reinvent** - Check existing code for similar functionality before creating new patterns
+- **Examples**:
+  - Query string handling: Always use `useSearchParams` hook from `react-router-dom` (never manually parse `window.location.search`)
+  - State initialization: Use direct values in `useState()` unless computation is expensive (no unnecessary functional form)
+  - Component structure: Follow existing component patterns for props, state, and effects
+- **When in doubt**: Look at similar components/files to see how they handle the same problem
+
 ### Component Patterns
 - **Functional components** with hooks (no class components)
 - **shadcn/ui** for all UI primitives (button, input, dialog, etc.)
@@ -867,7 +876,7 @@ Avoid:
 - **Recording method**: Canvas-based recording for all browsers (not just for mirroring)
   - **PRD approach**: Direct `HTMLMediaElement.captureStream()` on video element (with canvas only for front camera mirroring)
   - **Current implementation**: Always use canvas-based recording - copy video frames to offscreen canvas at 30fps → `canvas.captureStream(30)` → `MediaRecorder`
-  - **Rationale**: 
+  - **Rationale**:
     - Consistent behavior across all browsers (no fallback logic needed)
     - Works reliably on Safari/iOS where direct video `captureStream()` fails on WebRTC streams
     - Simpler, more maintainable code with single implementation path

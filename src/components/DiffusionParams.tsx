@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
@@ -55,6 +56,8 @@ const TEXTURES = [
   },
 ];
 
+const DEFAULT_CUSTOM_PARAMS_JSON = '{\n  "prompts": [\n    {\n      "text": "A 3D animated scene. A **panda** walks along a path towards the camera in a park on a spring day."\n    }\n  ]\n}';
+
 export interface BrewParams {
   prompt: string;
   texture: string | null;
@@ -108,6 +111,7 @@ export function DiffusionParams({
   handleStreamDiffusionParams,
   onError,
 }: DiffusionParamsProps) {
+  const [searchParams] = useSearchParams();
   const [texturePopoverOpen, setTexturePopoverOpen] = useState(false);
   const { toast } = useToast();
 
@@ -124,7 +128,21 @@ export function DiffusionParams({
     onBrewParamsChange(newBrewParams);
   }, [brewParams, onBrewParamsChange]);
 
+  const [customParamsJson, setCustomParamsJson] = useState(DEFAULT_CUSTOM_PARAMS_JSON);
+  const pipeline = searchParams.get('pipeline') || 'streamdiffusion';
+  const [isJsonValid, setIsJsonValid] = useState(true);
+
   useEffect(() => {
+    if (pipeline !== 'streamdiffusion') {
+        try {
+            const parsed = JSON.parse(customParamsJson);
+            setIsJsonValid(true);
+            handleStreamDiffusionParams(parsed as unknown as StreamDiffusionParams);
+        } catch (e) {
+            setIsJsonValid(false);
+        }
+        return;
+    }
     // Compute new stream params
     let sdParams: StreamDiffusionParams = {
       model_id: "stabilityai/sdxl-turbo",
@@ -190,7 +208,7 @@ export function DiffusionParams({
       };
     }
     handleStreamDiffusionParams(sdParams);
-  }, [handleStreamDiffusionParams, prompt, intensity, quality, control, textureId, textureWeight, onError, toast]);
+  }, [handleStreamDiffusionParams, prompt, intensity, quality, control, textureId, textureWeight, onError, toast, pipeline, customParamsJson]);
 
   const shufflePrompt = useCallback(() => {
     const possiblePrompts = !cameraType
@@ -232,6 +250,34 @@ export function DiffusionParams({
   const handleControlChange = useCallback((val: number[]) => {
     updateBrewParams({ control: val[0] });
   }, [updateBrewParams]);
+
+  if (pipeline !== 'streamdiffusion') {
+      return (
+        <div className="bg-neutral-950 rounded-3xl p-5 border border-neutral-800 space-y-4 shadow-inner">
+            <div>
+                <label className="text-sm font-medium mb-2 block text-neutral-300">
+                  Custom Pipeline Configuration (JSON)
+                </label>
+                <div className="mb-2 text-xs text-neutral-400">
+                    Pipeline: <span className="font-mono text-neutral-200">{pipeline}</span>
+                </div>
+                <Textarea
+                    value={customParamsJson}
+                    onChange={(e) => setCustomParamsJson(e.target.value)}
+                    placeholder="Enter JSON configuration..."
+                    className={`bg-neutral-950 border focus:ring-0 text-neutral-100 placeholder:text-neutral-500 min-h-[180px] font-mono text-xs ${
+                      isJsonValid
+                        ? 'border-neutral-800 focus:border-neutral-600'
+                        : 'border-red-500/50 focus:border-red-500'
+                    }`}
+                />
+                {!isJsonValid && (
+                  <p className="mt-1 text-xs text-red-400">Invalid JSON</p>
+                )}
+            </div>
+        </div>
+      );
+  }
 
   return (
     <div className="bg-neutral-950 rounded-3xl p-5 border border-neutral-800 space-y-4 shadow-inner">

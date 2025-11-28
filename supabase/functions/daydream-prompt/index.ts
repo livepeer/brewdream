@@ -14,12 +14,16 @@ serve(async (req) => {
   console.log('[EDGE] daydream-prompt function called (version: 2025-10-12-correct-api-endpoint)');
 
   try {
-    const DAYDREAM_API_KEY = Deno.env.get('DAYDREAM_API_KEY');
+    const { streamId, isStaging, ...promptBody } = await req.json();
+
+    const apiKeyEnvName = isStaging ? 'STAGING_DAYDREAM_API_KEY' : 'DAYDREAM_API_KEY';
+    const DAYDREAM_API_KEY = Deno.env.get(apiKeyEnvName);
+
     if (!DAYDREAM_API_KEY) {
-      throw new Error('DAYDREAM_API_KEY is not configured');
+      throw new Error(`${apiKeyEnvName} is not configured`);
     }
 
-    const { streamId, ...promptBody } = await req.json();
+    const baseUrl = isStaging ? 'https://api.daydream.monster' : 'https://api.daydream.live';
     if (!streamId) {
       throw new Error('streamId is required');
     }
@@ -28,7 +32,7 @@ serve(async (req) => {
     console.log('[EDGE] Params being sent:', JSON.stringify(promptBody, null, 2));
 
     // PATCH /v1/streams/:id with body: { params: { ... } }
-    const response = await fetch(`https://api.daydream.live/v1/streams/${streamId}`, {
+    const response = await fetch(`${baseUrl}/v1/streams/${streamId}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${DAYDREAM_API_KEY}`,

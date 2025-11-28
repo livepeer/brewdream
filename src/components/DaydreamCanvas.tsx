@@ -37,7 +37,7 @@ export interface StreamDiffusionParams {
 }
 
 export interface DaydreamClient {
-  createStream(pipelineId: string, initialParams?: StreamDiffusionParams): Promise<DaydreamStream>;
+  createStream(pipeline: string, initialParams?: StreamDiffusionParams): Promise<DaydreamStream>;
   updatePrompts(streamId: string, params: StreamDiffusionParams): Promise<void>;
 }
 
@@ -346,6 +346,8 @@ export interface DaydreamCanvasProps {
 
   // Stream diffusion params, defaults to an SDXL turbo model with a depth, canny, and tile controlnet
   params?: StreamDiffusionParams;
+  // Pipeline type, defaults to streamdiffusion
+  pipeline?: string;
   // Video frame source, defaults to blank if not provided
   videoSource?:
     | {
@@ -427,6 +429,7 @@ function computeCoverDrawRect(
 export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
   client,
   params,
+  pipeline = 'streamdiffusion',
   videoSource = { type: 'blank' },
   audioSource = { type: 'silent' },
   size = 512,
@@ -956,18 +959,9 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
           ...(params || {}),
         };
 
-        let pipelineId: string;
-        if (initialParams.model_id === 'stabilityai/sdxl-turbo') {
-          pipelineId = initialParams.ip_adapter?.type === 'faceid' ? 'pip_SDXL-turbo-faceid' : 'pip_SDXL-turbo';
-        } else if (initialParams.model_id === 'stabilityai/sd-turbo') {
-          pipelineId = 'pip_SD-turbo';
-        } else {
-          pipelineId = 'pip_SD15';
-        }
-
         // Stream creation with retry logic (3 retries, exponential backoff starting at 1s)
         const streamData = await retryWithBackoff(
-          () => client.createStream(pipelineId, initialParams),
+          () => client.createStream(pipeline, initialParams),
           {
             maxRetries: 3,
             baseDelayMs: 1000,
@@ -1019,7 +1013,7 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
         onError?.(e);
         throw e;
       }
-    }, [client, buildPublishStream, enqueueParamsUpdate, onError, onReady, params, onWhipRetry, onWhipRetryLimitExceeded, onConnectionStateChange]);
+    }, [client, buildPublishStream, enqueueParamsUpdate, onError, onReady, params, pipeline, onWhipRetry, onWhipRetryLimitExceeded, onConnectionStateChange]);
 
     // Stop publishing and cleanup
     const stop = useCallback(async () => {

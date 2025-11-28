@@ -2,16 +2,17 @@ import { DaydreamStream, StreamDiffusionParams, DaydreamClient } from '@/compone
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Create a new Daydream stream with the StreamDiffusion pipeline
+ * Create a new Daydream stream with the specified pipeline
  * If initialParams provided, the edge function handles parameter initialization with retry logic
  */
-const createDaydreamStream = async (pipelineId: string, initialParams?: StreamDiffusionParams): Promise<DaydreamStream> => {
+const createDaydreamStream = async (pipeline: string, initialParams?: StreamDiffusionParams): Promise<DaydreamStream> => {
   console.log('[DAYDREAM] Creating stream with initialParams:', JSON.stringify(initialParams, null, 2));
 
   const { data, error } = await supabase.functions.invoke('daydream-stream', {
     body: {
-      pipeline_id: pipelineId,
-      initialParams // Will be sent as pipeline_params to Daydream
+      pipeline,
+      initialParams, // Will be sent as params to Daydream
+      isStaging: typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('staging'),
     }
   });
 
@@ -41,7 +42,8 @@ const updateDaydreamPrompts = async (
   const { data, error } = await supabase.functions.invoke('daydream-prompt', {
     body: {
       streamId,
-      params
+      params,
+      isStaging: typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('staging')
     }
   });
 
