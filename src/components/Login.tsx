@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/useUser";
@@ -21,10 +21,13 @@ export function Login() {
   const cooldownTimerRef = useRef<number | null>(null);
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  
+
   // Use the unified user hook with allowSignedOff to prevent redirect loop
   const { user, loading: userLoading, session } = useUser({ allowSignedOff: true });
+
+  const returnUrl = useMemo(() => searchParams.get('returnUrl') || '/capture', [searchParams]);
 
   // Update isAnonymous state based on session
   useEffect(() => {
@@ -34,12 +37,12 @@ export function Login() {
     }
   }, [session]);
 
-  // Redirect to capture if we already have a user (and not anonymous)
+  // Redirect to returnUrl or capture if we already have a user (and not anonymous)
   useEffect(() => {
     if (!userLoading && user && !isAnonymous) {
-      navigate("/capture");
+      navigate(returnUrl);
     }
-  }, [user, userLoading, isAnonymous, navigate]);
+  }, [user, userLoading, isAnonymous, navigate, returnUrl]);
 
   // Cleanup timer
   useEffect(() => {
@@ -71,7 +74,7 @@ export function Login() {
       // The useUser hook will handle upserting the user to the database
       // Just show success and navigate
       toast({ title: "Welcome!", description: "You can start creating clips right away" });
-      navigate("/capture");
+      navigate(returnUrl);
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -134,7 +137,7 @@ export function Login() {
         options: { shouldCreateUser: true },
       });
       if (error) throw error;
-      
+
       setJustResent(true);
       startResendCooldown(60);
       setTimeout(() => setJustResent(false), 900);
@@ -156,12 +159,12 @@ export function Login() {
             title: "Success!",
             description: "Logged in successfully",
           });
-          navigate("/capture");
+          navigate(returnUrl);
         }
       }
     });
     return () => subscription.unsubscribe();
-  }, [navigate, toast]);
+  }, [navigate, toast, returnUrl]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-background">
@@ -221,7 +224,7 @@ export function Login() {
 
                 {isAnonymous && (
                   <Button
-                    onClick={() => navigate("/capture")}
+                    onClick={() => navigate(returnUrl)}
                     disabled={anonLoading || emailLoading}
                     variant="outline"
                     className="w-full h-12 border-border text-muted-foreground hover:text-foreground transition-colors"

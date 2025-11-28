@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Plus, Video, VideoIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -11,6 +11,7 @@ interface FloatingFABProps {
 export function FloatingFAB({ isAuthenticated }: FloatingFABProps) {
   const [showOnDesktop, setShowOnDesktop] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -57,7 +58,7 @@ export function FloatingFAB({ isAuthenticated }: FloatingFABProps) {
          className="bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white hover:scale-105"
          asChild
        >
-         <Link to={isAuthenticated ? "/capture" : "/login"}>
+         <Link to={isAuthenticated ? "/capture" + location.search : `/login?returnUrl=${encodeURIComponent('/capture' + location.search)}`}>
            <Video className="h-4 w-4" />
            Clip for Coffee
          </Link>

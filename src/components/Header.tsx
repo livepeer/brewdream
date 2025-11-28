@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useLocation } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Video, ExternalLink, ArrowLeft } from "lucide-react"
 import { useState } from "react"
@@ -11,6 +11,7 @@ interface HeaderProps {
 
 export function Header({ isAuthenticated = false, showBackButton = false, onBackClick }: HeaderProps) {
   const [isRecording, setIsRecording] = useState(false)
+  const location = useLocation()
 
   return (
     <header className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative z-50">
@@ -46,7 +47,7 @@ export function Header({ isAuthenticated = false, showBackButton = false, onBack
             asChild
             disabled={isRecording}
           >
-            <Link to={isAuthenticated ? "/capture" : "/login"}>
+            <Link to={isAuthenticated ? "/capture" + location.search : `/login?returnUrl=${encodeURIComponent('/capture' + location.search)}`}>
               <Video className="h-4 w-4" />
               {isRecording ? "Recording..." : "Clip for Coffee"}
             </Link>

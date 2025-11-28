@@ -1,28 +1,30 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Video, Sparkles, Coffee } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/hooks/useUser';
 
 export function Landing() {
   const navigate = useNavigate();
-  
+  const location = useLocation();
+
   // Use the unified user hook (allow signed off to see landing page)
   const { user, loading } = useUser({ allowSignedOff: true });
 
   // If logged in, redirect to capture
   useEffect(() => {
     if (!loading && user) {
-      navigate('/capture');
+      navigate('/capture' + location.search);
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, location.search]);
 
   const handleStartClick = () => {
     // Navigate based on whether user exists
     if (user) {
-      navigate('/capture');
+      navigate('/capture' + location.search);
     } else {
-      navigate('/login');
+      const returnUrl = '/capture' + location.search;
+      navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
     }
   };
 
