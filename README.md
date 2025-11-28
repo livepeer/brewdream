@@ -7,7 +7,7 @@
 
 ## Project info
 
-**Project**: Brewdream - Mobile-first microsite for Livepeer × Daydream Summit (Open Source AI Week)
+**Project**: Brewdream - Mobile-first microsite originally built for the [Real Time Video AI Summit](https://luma.com/seh85x03)
 
 **What it does**: Attendees scan QR, create AI-stylized video clips (3-10s), share on X, get coffee tickets
 
