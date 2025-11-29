@@ -35,13 +35,15 @@ const createDaydreamStream = async (pipeline: string, initialParams?: StreamDiff
  */
 const updateDaydreamPrompts = async (
   streamId: string,
-  params: StreamDiffusionParams
+  params: StreamDiffusionParams,
+  pipeline: string = 'streamdiffusion'
 ): Promise<void> => {
   console.log('[DAYDREAM] Updating stream', streamId, 'with params:', JSON.stringify(params, null, 2));
 
   const { data, error } = await supabase.functions.invoke('daydream-prompt', {
     body: {
       streamId,
+      pipeline,
       params,
       isStaging: typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('staging')
     }

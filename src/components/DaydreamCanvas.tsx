@@ -38,7 +38,7 @@ export interface StreamDiffusionParams {
 
 export interface DaydreamClient {
   createStream(pipeline: string, initialParams?: StreamDiffusionParams): Promise<DaydreamStream>;
-  updatePrompts(streamId: string, params: StreamDiffusionParams): Promise<void>;
+  updatePrompts(streamId: string, params: StreamDiffusionParams, pipeline: string): Promise<void>;
 }
 
 // Default stream diffusion parameters
@@ -136,9 +136,6 @@ async function startWhipPublish(
 ): Promise<{ pc: RTCPeerConnection; playbackUrl: string | null }> {
   const maxRetries = options.maxRetries ?? 2;
   const retryDelayBaseMs = options.retryDelayBaseMs ?? 1000;
-  let retryCount = 0;
-  let lastRetryTime = 0;
-  const RETRY_RESET_SECONDS = 10;
 
   const attemptConnection = async (): Promise<{ pc: RTCPeerConnection; playbackUrl: string | null }> => {
     const pc = new RTCPeerConnection({
@@ -150,110 +147,26 @@ async function startWhipPublish(
       iceCandidatePoolSize: 3,
     });
 
-    // Set up connection state monitoring
-    let disconnectedGraceTimeout: ReturnType<typeof setTimeout> | null = null;
-    let connectionEstablished = false;
-
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
       options.onConnectionStateChange?.(state);
 
-      switch (state) {
-        case 'connected':
-          connectionEstablished = true;
-          if (disconnectedGraceTimeout) {
-            clearTimeout(disconnectedGraceTimeout);
-            disconnectedGraceTimeout = null;
-          }
-          break;
-        case 'disconnected':
-          connectionEstablished = false;
-          if (disconnectedGraceTimeout) {
-            clearTimeout(disconnectedGraceTimeout);
-            disconnectedGraceTimeout = null;
-          }
-          try {
-            pc.restartIce();
-          } catch {
-            // ICE restart failed, will retry connection
-          }
-          // Grace period before considering it a failure
-          disconnectedGraceTimeout = setTimeout(() => {
-            if (pc.connectionState === 'disconnected') {
-              const now = Date.now();
-              // Reset retry count if enough time has passed since last retry
-              if (now - lastRetryTime > RETRY_RESET_SECONDS * 1000) {
-                retryCount = 0;
-              }
-
-              if (retryCount < maxRetries) {
-                retryCount++;
-                lastRetryTime = now;
-                const delay = retryDelayBaseMs * Math.pow(2, retryCount - 1);
-                options.onRetry?.(retryCount, new Error('Connection disconnected'));
-                setTimeout(() => {
-                  attemptConnection().catch(() => {
-                    if (retryCount >= maxRetries) {
-                      options.onRetryLimitExceeded?.();
-                    }
-                  });
-                }, delay);
-              } else {
-                options.onRetryLimitExceeded?.();
-              }
-            }
-          }, 2000);
-          break;
-        case 'failed': {
-          connectionEstablished = false;
-          if (disconnectedGraceTimeout) {
-            clearTimeout(disconnectedGraceTimeout);
-            disconnectedGraceTimeout = null;
-          }
-
-          const now = Date.now();
-          // Reset retry count if enough time has passed since last retry
-          if (now - lastRetryTime > RETRY_RESET_SECONDS * 1000) {
-            retryCount = 0;
-          }
-
-          if (retryCount < maxRetries) {
-            retryCount++;
-            lastRetryTime = now;
-            const delay = retryDelayBaseMs * Math.pow(2, retryCount - 1);
-            options.onRetry?.(retryCount, new Error('Connection failed'));
-            setTimeout(() => {
-              attemptConnection().catch(() => {
-                if (retryCount >= maxRetries) {
-                  options.onRetryLimitExceeded?.();
-                }
-              });
-            }, delay);
-          } else {
-            options.onRetryLimitExceeded?.();
-          }
-          break;
+      if (state === 'disconnected') {
+        try {
+          pc.restartIce();
+        } catch {
+          // Ignore
         }
-        case 'closed':
-          connectionEstablished = false;
-          if (disconnectedGraceTimeout) {
-            clearTimeout(disconnectedGraceTimeout);
-            disconnectedGraceTimeout = null;
-          }
-          break;
       }
     };
 
     // Handle ICE connection state changes
     pc.oniceconnectionstatechange = () => {
-      if (
-        (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') &&
-        retryCount < maxRetries
-      ) {
+      if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
         try {
           pc.restartIce();
         } catch {
-          // ICE restart failed, will retry connection
+          // Ignore
         }
       }
     };
@@ -290,38 +203,42 @@ async function startWhipPublish(
 
     // Send offer to WHIP endpoint
     const offerSdp = pc.localDescription!.sdp!;
-    const response = await fetch(whipUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/sdp',
-      },
-      body: offerSdp,
-    });
 
-    if (!response.ok) {
-      // Don't retry on 4xx errors
-      if (response.status >= 400 && response.status < 500) {
-        throw new Error(`WHIP publish failed (non-retryable): ${response.status} ${response.statusText}`);
+    try {
+      const response = await fetch(whipUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/sdp',
+        },
+        body: offerSdp,
+      });
+
+      if (!response.ok) {
+        // Don't retry on 4xx errors
+        if (response.status >= 400 && response.status < 500) {
+          throw new Error(`WHIP publish failed (non-retryable): ${response.status} ${response.statusText}`);
+        }
+        throw new Error(`WHIP publish failed: ${response.status} ${response.statusText}`);
       }
-      throw new Error(`WHIP publish failed: ${response.status} ${response.statusText}`);
+
+      // Capture low-latency WebRTC playback URL from response headers
+      const playbackUrl = response.headers.get('livepeer-playback-url') || null;
+
+      // Get answer SDP and set it
+      const answerSdp = await response.text();
+      await pc.setRemoteDescription({
+        type: 'answer',
+        sdp: answerSdp,
+      });
+
+      return { pc, playbackUrl };
+    } catch (error) {
+      pc.close();
+      throw error;
     }
-
-    // Capture low-latency WebRTC playback URL from response headers
-    const playbackUrl = response.headers.get('livepeer-playback-url') || null;
-
-    // Get answer SDP and set it
-    const answerSdp = await response.text();
-    await pc.setRemoteDescription({
-      type: 'answer',
-      sdp: answerSdp,
-    });
-
-    retryCount = 0; // Reset on successful initial connection
-    lastRetryTime = 0; // Reset timestamp on success
-    return { pc, playbackUrl };
   };
 
-  // Initial attempt with retry wrapper for initial connection failures
+  // Initial attempt with retry wrapper
   return retryWithBackoff(
     attemptConnection,
     {
@@ -487,6 +404,12 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
     const playbackIdRef = useRef<string | null>(null);
     const playbackUrlRef = useRef<string | null>(null);
     const readyForParamUpdatesRef = useRef<boolean>(false);
+
+    // Retry state refs
+    const whipRetryCountRef = useRef(0);
+    const connectionStableTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isStoppingRef = useRef(false);
+    const restartRef = useRef<() => Promise<void>>(async () => {});
 
     // Flags for background auto-restart
     const wasRunningRef = useRef<boolean>(false);
@@ -915,7 +838,7 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
           () => client.updatePrompts(streamId, {
             ...DEFAULT_STREAM_DIFFUSION_PARAMS,
             ...latest,
-          }),
+          }, pipeline),
           {
             maxRetries: 3,
             baseDelayMs: 1000,
@@ -939,7 +862,7 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
           });
         }
       }
-    }, [client, onError]);
+    }, [client, onError, pipeline]);
 
     const enqueueParamsUpdate = useCallback(() => {
       pendingParamsRef.current = latestParamsRef.current;
@@ -952,6 +875,7 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
       if (pcRef.current) return; // already running
       try {
         setIsStarted(true);
+        isStoppingRef.current = false;
 
         // Create stream with initial params FIRST (with retry)
         const initialParams: StreamDiffusionParams = {
@@ -993,6 +917,41 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
             },
             onConnectionStateChange: (state) => {
               onConnectionStateChange?.(state);
+
+              if (state === 'connected') {
+                // Connection established, schedule reset of retry count
+                if (connectionStableTimeoutRef.current) {
+                  clearTimeout(connectionStableTimeoutRef.current);
+                }
+                connectionStableTimeoutRef.current = setTimeout(() => {
+                  whipRetryCountRef.current = 0;
+                }, 10000); // 10 seconds stable = reset retries
+              } else if (state === 'disconnected' || state === 'failed') {
+                // Cancel stable reset
+                if (connectionStableTimeoutRef.current) {
+                  clearTimeout(connectionStableTimeoutRef.current);
+                  connectionStableTimeoutRef.current = null;
+                }
+
+                if (isStoppingRef.current) return;
+
+                const maxRetries = 3;
+                if (whipRetryCountRef.current < maxRetries) {
+                  whipRetryCountRef.current++;
+                  const delay = 1000 * Math.pow(2, whipRetryCountRef.current - 1);
+                  console.log(`[DaydreamCanvas] Connection lost, retrying in ${delay}ms... (Attempt ${whipRetryCountRef.current}/${maxRetries})`);
+
+                  setTimeout(() => {
+                    if (!isStoppingRef.current) {
+                      restartRef.current();
+                    }
+                  }, delay);
+                } else {
+                  console.error('[DaydreamCanvas] Connection lost, retry limit exceeded');
+                  onError?.(new Error('Connection lost, retry limit exceeded'));
+                  onWhipRetryLimitExceeded?.();
+                }
+              }
             },
           }
         );
@@ -1018,7 +977,14 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
     // Stop publishing and cleanup
     const stop = useCallback(async () => {
       setIsStarted(false);
+      isStoppingRef.current = true;
       readyForParamUpdatesRef.current = false;
+
+      // Clear stable timeout
+      if (connectionStableTimeoutRef.current) {
+        clearTimeout(connectionStableTimeoutRef.current);
+        connectionStableTimeoutRef.current = null;
+      }
 
       // Close RTCPeerConnection
       if (pcRef.current) {
@@ -1068,6 +1034,14 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
       playbackIdRef.current = null;
       playbackUrlRef.current = null;
     }, []);
+
+    // Keep restartRef updated to break circular dependency
+    useEffect(() => {
+      restartRef.current = async () => {
+        await stop();
+        await start();
+      };
+    }, [start, stop]);
 
     // Background auto-stop/start (mobile default)
     useEffect(() => {

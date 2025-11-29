@@ -46,7 +46,7 @@ export class DaydreamApiClient implements DaydreamClient {
    * Update StreamDiffusion prompts for a stream
    * Sends the full params object as required by Daydream API
    */
-  async updatePrompts(streamId: string, params: StreamDiffusionParams): Promise<void> {
+  async updatePrompts(streamId: string, params: StreamDiffusionParams, pipeline: string = 'streamdiffusion'): Promise<void> {
     console.log('[DAYDREAM] Updating stream', streamId, 'with params:', JSON.stringify(params, null, 2));
 
     const response = await fetch(`${this.baseUrl}/v1/streams/${streamId}`, {
@@ -55,7 +55,7 @@ export class DaydreamApiClient implements DaydreamClient {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ params }),
+      body: JSON.stringify({ pipeline, params }),
     });
 
     const data = await response.json();
