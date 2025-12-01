@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 
@@ -21,14 +21,14 @@ interface UseUserReturn {
 
 /**
  * Unified authentication hook that handles user session and database sync.
- * 
+ *
  * This hook:
  * - Gets the current logged in user from Supabase auth
  * - If there's a session, reads the user from our users table
  * - If user doesn't exist in DB, upserts with retry logic
  * - Returns the user object if found/created
  * - Redirects to login if missing (unless allowSignedOff is true)
- * 
+ *
  * @param options.allowSignedOff - If true, returns null instead of redirecting when no user (default: false)
  * @returns { user, loading, session }
  */
@@ -38,20 +38,26 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
   const [session, setSession] = useState<{ user: SupabaseUser } | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     let mounted = true;
+
+    const redirectToLogin = () => {
+      if (!allowSignedOff) {
+        const returnUrl = location.pathname + location.search;
+        navigate(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
+      }
+    };
 
     const syncUser = async () => {
       try {
         // Get current session
         const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-        
+
         if (sessionError) {
           console.error('Error getting session:', sessionError);
-          if (!allowSignedOff) {
-            navigate('/login');
-          }
+          redirectToLogin();
           return;
         }
 
@@ -61,10 +67,7 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
             setSession(null);
             setUser(null);
             setLoading(false);
-            
-            if (!allowSignedOff) {
-              navigate('/login');
-            }
+            redirectToLogin();
           }
           return;
         }
@@ -96,10 +99,10 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
 
         // User doesn't exist - upsert with retry logic
         console.log('User not found in database, upserting with retry logic...');
-        
+
         const maxRetries = 5;
         const retryDelays = [0, 500, 1000, 2000, 5000]; // Progressive backoff
-        
+
         let lastError: Error | null = null;
         let success = false;
 
@@ -115,9 +118,9 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
             const { error: upsertError } = await supabase
               .from('users')
               .upsert(
-                { 
-                  id: currentSession.user.id, 
-                  email: currentSession.user.email || null 
+                {
+                  id: currentSession.user.id,
+                  email: currentSession.user.email || null
                 },
                 { onConflict: 'id' }
               );
@@ -160,20 +163,14 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
         if (!success && mounted) {
           console.error('All upsert attempts failed:', lastError);
           setLoading(false);
-          
-          if (!allowSignedOff) {
-            navigate('/login');
-          }
+          redirectToLogin();
         }
 
       } catch (error) {
         console.error('Error in useUser:', error);
         if (mounted) {
           setLoading(false);
-          
-          if (!allowSignedOff) {
-            navigate('/login');
-          }
+          redirectToLogin();
         }
       }
     };
@@ -183,7 +180,7 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
-      
+
       // Re-run the sync when auth state changes
       syncUser();
     });
@@ -192,7 +189,7 @@ export function useUser(options: UseUserOptions = {}): UseUserReturn {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [allowSignedOff, navigate]);
+  }, [allowSignedOff, navigate, location.pathname, location.search]);
 
   return { user, loading, session };
 }
