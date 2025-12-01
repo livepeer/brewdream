@@ -56,8 +56,6 @@ const TEXTURES = [
   },
 ];
 
-const DEFAULT_CUSTOM_PARAMS_JSON = '{\n  "prompts": [\n    {\n      "text": "A 3D animated scene. A **panda** walks along a path towards the camera in a park on a spring day."\n    }\n  ]\n}';
-
 export interface BrewParams {
   prompt: string;
   texture: string | null;
@@ -65,6 +63,7 @@ export interface BrewParams {
   intensity: number;
   quality: number;
   control: number;
+  customJson?: string;
 }
 
 interface DiffusionParamsProps {
@@ -130,7 +129,7 @@ export function DiffusionParams({
     onBrewParamsChange(newBrewParams);
   }, [brewParams, onBrewParamsChange]);
 
-  const [customParamsJson, setCustomParamsJson] = useState(DEFAULT_CUSTOM_PARAMS_JSON);
+  const customParamsJson = brewParams.customJson;
   const pipeline = searchParams.get('pipeline') || 'streamdiffusion';
   const [isJsonValid, setIsJsonValid] = useState(true);
 
@@ -258,6 +257,10 @@ export function DiffusionParams({
     updateBrewParams({ control: val[0] });
   }, [updateBrewParams]);
 
+  const handleCustomJsonChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    updateBrewParams({ customJson: e.target.value });
+  }, [updateBrewParams]);
+
   if (pipeline !== 'streamdiffusion') {
       return (
         <div className="bg-neutral-950 rounded-3xl p-5 border border-neutral-800 space-y-4 shadow-inner">
@@ -270,7 +273,7 @@ export function DiffusionParams({
                 </div>
                 <Textarea
                     value={customParamsJson}
-                    onChange={(e) => setCustomParamsJson(e.target.value)}
+                    onChange={handleCustomJsonChange}
                     placeholder="Enter JSON configuration..."
                     className={`bg-neutral-950 border focus:ring-0 text-neutral-100 placeholder:text-neutral-500 min-h-[180px] font-mono text-xs ${
                       isJsonValid

@@ -26,6 +26,8 @@ import {
   type BrewParams,
 } from "@/components/DiffusionParams";
 
+const DEFAULT_CUSTOM_PARAMS_JSON = '{\n  "prompts": [\n    {\n      "text": "A 3D animated scene. A **panda** walks along a path towards the camera in a park on a spring day."\n    }\n  ]\n}';
+
 // Detect if device likely has front/back cameras (mobile/tablet)
 const hasMultipleCameras = (): boolean => {
   // Check for touch capability (mobile/tablet indicator)
@@ -85,6 +87,7 @@ const readBrewParamsFromQuery = (searchParams: URLSearchParams): BrewParams => {
   const intensity = parseFloat(searchParams.get("intensity") || "5");
   const quality = parseFloat(searchParams.get("quality") || "0.4");
   const control = parseFloat(searchParams.get("control") || "1");
+  const customJson = searchParams.get("customJson") || DEFAULT_CUSTOM_PARAMS_JSON;
 
   return {
     prompt,
@@ -93,6 +96,7 @@ const readBrewParamsFromQuery = (searchParams: URLSearchParams): BrewParams => {
     intensity: isNaN(intensity) ? 5 : intensity,
     quality: isNaN(quality) ? 0.4 : quality,
     control: isNaN(control) ? 1 : control,
+    customJson,
   };
 };
 
@@ -696,6 +700,9 @@ export default function Capture() {
     }
     if (brewParams.control !== 1) {
       newParams.set("control", brewParams.control.toString());
+    }
+    if (brewParams.customJson !== DEFAULT_CUSTOM_PARAMS_JSON) {
+      newParams.set("customJson", brewParams.customJson);
     }
 
     let queryString = newParams.toString();
