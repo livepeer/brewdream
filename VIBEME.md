@@ -154,7 +154,7 @@ These are **non-negotiable** technical requirements:
 3. **clips**: Video clips with AI metadata (prompt, texture_id, texture_weight, t_index_list, duration_ms)
 4. **tickets**: Coffee QR codes (code, redeemed flag)
 
-**RLS Policies**: Public read for clips/sessions, authenticated write, users own their tickets
+**RLS Policies**: Public read for clips, owner-only read for sessions/users, authenticated write, users own their tickets
 
 ### Video Processing Flow
 

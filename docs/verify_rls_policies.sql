@@ -31,16 +31,10 @@ WHERE id != auth.uid();
 -- TEST 2: Verify sessions table policies
 -- ====================================================================================
 
--- This should show all sessions (public read is intentional)
-SELECT count(*) as total_sessions,
-       'Public read is OK - needed for clip ownership' as note
-FROM public.sessions;
-
--- This should show only sessions owned by current user
+-- This should show only sessions owned by current user (security fix: no public read)
 SELECT count(*) as my_sessions,
        'Should only show sessions I own' as expected
-FROM public.sessions
-WHERE user_id = auth.uid();
+FROM public.sessions;
 
 -- Test: Try to insert session with different user_id (should fail via RLS)
 -- INSERT INTO public.sessions (user_id, stream_id, playback_id, camera_type)
@@ -65,8 +59,7 @@ WHERE session_id IN (
 );
 
 -- Test: Try to insert clip for someone else's session (should fail via RLS)
--- First get a session you don't own:
--- SELECT id FROM public.sessions WHERE user_id != auth.uid() LIMIT 1;
+-- Note: Can't even query sessions you don't own, so this test requires service role
 -- Then try: INSERT INTO public.clips (session_id, asset_playback_id, prompt, duration_ms) ...
 -- Expected: RLS policy violation
 
@@ -144,7 +137,7 @@ ORDER BY tablename, policyname;
 
 -- Expected policies:
 -- ✅ users: 3 policies (SELECT, INSERT, UPDATE) - all using auth.uid() = id
--- ✅ sessions: 2 policies (SELECT with true, INSERT with user_id check)
+-- ✅ sessions: 2 policies (SELECT with user_id check, INSERT with user_id check)
 -- ✅ clips: 3 policies (SELECT with true, INSERT with session check, UPDATE with session check)
 -- ✅ tickets: 3 policies (SELECT/INSERT/UPDATE with session ownership check)
 -- ✅ clip_likes: 3 policies (SELECT with true, INSERT/DELETE with user_id check)
