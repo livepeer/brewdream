@@ -42,7 +42,7 @@ export interface DaydreamClient {
 }
 
 // Default stream diffusion parameters
-export const DEFAULT_STREAM_DIFFUSION_PARAMS = {
+export const DEFAULT_STREAMDIFFUSION_PARAMS = {
   model_id: 'stabilityai/sdxl-turbo',
   prompt: "psychedelia",
   negative_prompt: 'blurry, low quality, flat, 2d, distorted',
@@ -80,6 +80,17 @@ export const DEFAULT_STREAM_DIFFUSION_PARAMS = {
     insightface_model_name: 'buffalo_l' as const,
   },
 };
+
+// Apply pipeline-specific defaults to params
+function applyPipelineDefaults(
+  pipeline: string,
+  params: StreamDiffusionParams | undefined
+): StreamDiffusionParams {
+  if (pipeline === 'streamdiffusion') {
+    return { ...DEFAULT_STREAMDIFFUSION_PARAMS, ...(params || {}) };
+  }
+  return (params || {}) as StreamDiffusionParams;
+}
 
 // Add retry utility function with 4xx error detection
 async function retryWithBackoff<T>(
@@ -829,16 +840,15 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
       // Clear pending immediately to detect new updates during send
       pendingParamsRef.current = null;
       paramsInFlightRef.current = true;
-      // Snapshot latest for eventual consistency; always include required defaults
-      const latest = latestParamsRef.current || next;
 
       try {
         // Param updates with retry logic (3 retries, exponential backoff starting at 1s)
         await retryWithBackoff(
-          () => client.updatePrompts(streamId, {
-            ...DEFAULT_STREAM_DIFFUSION_PARAMS,
-            ...latest,
-          }, pipeline),
+          () => {
+            // Get latest params on each retry attempt for eventual consistency
+            const latest = latestParamsRef.current || next;
+            return client.updatePrompts(streamId, applyPipelineDefaults(pipeline, latest), pipeline);
+          },
           {
             maxRetries: 3,
             baseDelayMs: 1000,
@@ -878,10 +888,7 @@ export const DaydreamCanvas: React.FC<DaydreamCanvasProps> = ({
         isStoppingRef.current = false;
 
         // Create stream with initial params FIRST (with retry)
-        const initialParams: StreamDiffusionParams = {
-          ...DEFAULT_STREAM_DIFFUSION_PARAMS,
-          ...(params || {}),
-        };
+        const initialParams = applyPipelineDefaults(pipeline, params);
 
         // Stream creation with retry logic (3 retries, exponential backoff starting at 1s)
         const streamData = await retryWithBackoff(
